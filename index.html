@@ -217,6 +217,10 @@ function init() {
     initGrid();
     // 地图点击
     cv.addEventListener('click', onMapClick);
+    // 添加初始日志
+    addLog(0, '系统启动，开始夜间巡检', 's');
+    addLog(0, 'K230视觉模块已就绪', 's');
+    addLog(0, '机器人从起点出发巡航', 's');
     // 开始循环
     requestAnimationFrame(loop);
 }
@@ -701,6 +705,8 @@ function renderCam() {
 }
 
 // ===================== 主循环 =====================
+let speedMul = 1; // 速度倍率
+
 function loop(ts) {
     if(!lastT)lastT=ts;
     const raw=(ts-lastT)/1000; lastT=ts;
@@ -708,14 +714,18 @@ function loop(ts) {
     if(fpsT>=1){fps=fpsCnt;fpsCnt=0;fpsT=0;document.getElementById('fps').textContent=fps;}
 
     if(simOn){
-        const dt=C.DT*1; // 不乘speedMultiplier，用真实帧率
-        simT+=dt; stats.rt=simT;
-        clkS+=dt;if(clkS>=60){clkS-=60;clkM++;}if(clkM>=60){clkM-=60;clkH++;}if(clkH>=24)clkH=0;
+        const dt = C.DT * speedMul;
+        simT += dt;
+        stats.rt = simT;
+        clkS += dt;
+        if(clkS>=60){clkS-=60;clkM++;}
+        if(clkM>=60){clkM-=60;clkH++;}
+        if(clkH>=24) clkH=0;
         updateRobot(dt);
-        for(const p of patients) updatePatient(p,dt);
-        updateUI();
+        for(const p of patients) updatePatient(p, dt);
     }
-
+    // 无论暂停与否都更新UI和渲染
+    updateUI();
     renderMap();
     renderCam();
     requestAnimationFrame(loop);
@@ -850,10 +860,8 @@ function toggleSim() {
     b.classList.toggle('on',simOn);
 }
 function setSpd(s) {
-    // 速度倍率通过调整帧间隔实现（简化：直接改巡航速度）
-    C.SPEED = 1.5 * s;
-    C.FAST_SPEED = 4.0 * s;
-    document.getElementById('spdT').textContent=s+'x';
+    speedMul = s;
+    document.getElementById('spdT').textContent = s+'x';
 }
 function resetSim() {
     simT=0;clkH=22;clkM=0;clkS=0;
