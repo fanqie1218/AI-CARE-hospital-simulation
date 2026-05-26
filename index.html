@@ -1,741 +1,1392 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AI-CARE 智慧病房巡检机器人 - 虚拟仿真系统</title>
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Microsoft YaHei',sans-serif;background:#080c18;color:#d0dce8;height:100vh;overflow:hidden;user-select:none}
-.hdr{height:44px;background:linear-gradient(90deg,#0a1628,#162040);border-bottom:1px solid #1e3050;display:flex;align-items:center;justify-content:space-between;padding:0 16px}
-.hdr-l{display:flex;align-items:center;gap:10px}
-.logo{width:28px;height:28px;background:#0088ff;border-radius:5px;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:12px;color:#fff}
-.ht{font-size:15px;font-weight:bold;color:#0088ff}
-.hdr-r{display:flex;gap:16px;align-items:center;font-size:11px}
-.dot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:3px}
-.dg{background:#00cc66;box-shadow:0 0 5px #00cc66}
-.dy{background:#ffaa00}
-.dr{background:#ff3344;box-shadow:0 0 5px #ff3344;animation:blink .8s infinite}
-@keyframes blink{50%{opacity:.3}}
-.mn{display:flex;height:calc(100vh - 44px)}
-.map-wrap{flex:1;padding:8px;display:flex;flex-direction:column;gap:6px}
-.map-bar{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
-.map-bar button{padding:5px 14px;background:#141e30;border:1px solid #1e3050;color:#d0dce8;border-radius:3px;cursor:pointer;font-size:11px;transition:.2s}
-.map-bar button:hover{border-color:#0088ff;background:#1a2a40}
-.map-bar button.on{background:#003366;border-color:#0088ff;color:#00aaff}
-.map-bar .lbl{font-size:10px;color:#5580aa}
-.map-box{flex:1;background:#040810;border:1px solid #1e3050;border-radius:4px;position:relative;overflow:hidden}
-#cv{display:block;width:100%;height:100%}
-.pnl{width:380px;background:#0e1525;border-left:1px solid #1e3050;display:flex;flex-direction:column;overflow-y:auto;flex-shrink:0}
-.pnl::-webkit-scrollbar{width:4px}.pnl::-webkit-scrollbar-thumb{background:#1e3050}
-.sec{border-bottom:1px solid #1e3050;padding:8px 10px}
-.sec-t{font-size:11px;font-weight:bold;color:#0088ff;margin-bottom:6px;display:flex;align-items:center;gap:5px}
-.sec-t::before{content:'';width:2px;height:10px;background:#0088ff;border-radius:1px}
-.rs-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px}
-.rs-i{background:#141e30;border-radius:3px;padding:4px 6px;font-size:10px}
-.rs-i .lb{color:#5580aa}.rs-i .vl{color:#d0dce8;font-weight:bold;font-size:12px}
-.cam{position:relative;background:#000;border-radius:3px;overflow:hidden}
-#camCv{display:block;width:100%;height:180px}
-.cam-tag{position:absolute;top:4px;left:4px;font-size:9px;color:#00cc66;background:rgba(0,0,0,.6);padding:1px 5px;border-radius:2px}
-.cam-priv{position:absolute;bottom:4px;right:4px;font-size:8px;color:#ffaa00;background:rgba(0,0,0,.6);padding:1px 5px;border-radius:2px}
-.alert-box{text-align:center;padding:8px;border-radius:4px;font-size:16px;font-weight:bold;transition:all .3s}
-.alert-box.s0{background:rgba(0,204,102,.1);color:#00cc66;border:1px solid rgba(0,204,102,.2)}
-.alert-box.s1{background:rgba(255,170,0,.1);color:#ffaa00;border:1px solid rgba(255,170,0,.2)}
-.alert-box.s2{background:rgba(255,136,0,.12);color:#ff8800;border:1px solid rgba(255,136,0,.25)}
-.alert-box.s3{background:rgba(255,51,68,.15);color:#ff3344;border:1px solid rgba(255,51,68,.3);animation:blink .6s infinite}
-.rg{display:grid;grid-template-columns:repeat(5,1fr);gap:3px}
-.rb{background:#141e30;border:1px solid #1e3050;border-radius:3px;padding:3px;text-align:center;font-size:9px;cursor:pointer;transition:.2s}
-.rb:hover{border-color:#0088ff}
-.rb.sel{border-color:#0088ff;background:#002244}
-.rb .rn{font-weight:bold;font-size:10px}.rb .rs{margin-top:1px}
-.rb.ok .rs{color:#00cc66}.rb.wrn .rs{color:#ffaa00}.rb.dng .rs{color:#ff3344}
-.rd{background:#141e30;border-radius:4px;padding:6px;font-size:10px}
-.rd h4{color:#0088ff;margin-bottom:3px;font-size:11px}
-.rd-r{display:flex;justify-content:space-between;padding:1px 0}
-.rd-r .k{color:#5580aa}.rd-r .v{color:#d0dce8}
-.log{max-height:120px;overflow-y:auto;font-size:10px;font-family:Consolas,monospace}
-.log::-webkit-scrollbar{width:3px}.log::-webkit-scrollbar-thumb{background:#1e3050}
-.le{padding:2px 0;border-bottom:1px solid rgba(255,255,255,.02);display:flex;gap:6px}
-.le .t{color:#5580aa;flex-shrink:0}.le .r{color:#0088ff;flex-shrink:0;width:40px}
-.le .m.d{color:#ff3344}.le .m.w{color:#ffaa00}.le .m.s{color:#00cc66}
-.mqtt{background:#060c14;border:1px solid #1e3050;border-radius:3px;padding:5px;font-size:9px;font-family:Consolas;color:#66aadd;max-height:60px;overflow-y:auto;white-space:pre-wrap}
-.sts{display:flex;justify-content:space-around;padding:4px 0}
-.sts-i{text-align:center}.sts-n{font-size:18px;font-weight:bold;color:#0088ff}.sts-l{font-size:9px;color:#5580aa}
-.sim-clock{display:flex;align-items:center;gap:8px;background:rgba(0,136,255,.08);border:1px solid rgba(0,136,255,.2);border-radius:6px;padding:4px 12px}
-.sim-clock .clock-icon{font-size:16px;animation:clockPulse 2s infinite}
-@keyframes clockPulse{0%,100%{opacity:1}50%{opacity:.6}}
-.sim-clock .clock-time{font-size:16px;font-weight:bold;color:#0088ff;font-family:Consolas,'Courier New',monospace;letter-spacing:1px}
-.sim-clock .clock-time .blink-colon{animation:colonBlink 1s infinite}
-@keyframes colonBlink{0%,100%{opacity:1}50%{opacity:.3}}
-.sim-clock .clock-period{font-size:10px;color:#5580aa;border-left:1px solid rgba(0,136,255,.2);padding-left:8px;line-height:1.2}
-.sim-clock .clock-period .period-name{color:#88bbee;font-weight:bold}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1920, initial-scale=1.0">
+    <title>AI-CARE 病房夜间高危巡检机器人 - 人机交互界面</title>
+    <style>
+        /* ========== 全局样式 ========== */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary-blue: #0066CC;
+            --dark-bg: #0a1628;
+            --card-bg: #0f1d32;
+            --border-color: #1a3a5c;
+            --text-primary: #ffffff;
+            --text-secondary: #8899aa;
+            --safe-green: #00cc66;
+            --warning-yellow: #ffcc00;
+            --alert-orange: #ff8800;
+            --danger-red: #ff3333;
+        }
+
+        body {
+            font-family: 'Microsoft YaHei', 'Segoe UI', sans-serif;
+            background: var(--dark-bg);
+            color: var(--text-primary);
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* ========== 头部标题栏 ========== */
+        .header {
+            background: linear-gradient(135deg, #0a1628 0%, #1a2a4a 100%);
+            border-bottom: 2px solid var(--primary-blue);
+            padding: 12px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 70px;
+        }
+
+        .header-title {
+            font-size: 28px;
+            font-weight: bold;
+            color: var(--primary-blue);
+            text-shadow: 0 0 20px rgba(0, 102, 204, 0.5);
+        }
+
+        .header-time {
+            font-size: 18px;
+            color: var(--text-secondary);
+        }
+
+        .sim-clock{display:flex;align-items:center;gap:8px;background:rgba(0,136,255,.08);border:1px solid rgba(0,136,255,.2);border-radius:6px;padding:6px 14px}
+        .sim-clock .clock-icon{font-size:18px;animation:clockPulse 2s infinite}
+        @keyframes clockPulse{0%,100%{opacity:1}50%{opacity:.6}}
+        .sim-clock .clock-time{font-size:18px;font-weight:bold;color:#0088ff;font-family:Consolas,'Courier New',monospace;letter-spacing:1px}
+        .sim-clock .clock-time .blink-colon{animation:colonBlink 1s infinite}
+        @keyframes colonBlink{0%,100%{opacity:1}50%{opacity:.3}}
+        .sim-clock .clock-period{font-size:10px;color:#5580aa;border-left:1px solid rgba(0,136,255,.2);padding-left:8px;line-height:1.4}
+        .sim-clock .clock-period .period-name{color:#88bbee;font-weight:bold}
+
+        .nav-btn{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;background:rgba(0,136,255,.1);border:1px solid rgba(0,136,255,.3);border-radius:6px;color:#0088ff;font-size:12px;text-decoration:none;cursor:pointer;transition:all .2s}
+        .nav-btn:hover{background:rgba(0,136,255,.2);border-color:#0088ff}
+
+        /* ========== 主布局 - 三栏 ========== */
+        .main-container {
+            display: flex;
+            height: calc(100vh - 70px);
+            gap: 15px;
+            padding: 15px;
+        }
+
+        /* ========== 左栏 - 控制面板 ========== */
+        .left-panel {
+            width: 320px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            flex-shrink: 0;
+        }
+
+        /* ========== 中栏 - 主显示区 ========== */
+        .center-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            min-width: 0;
+        }
+
+        /* ========== 右栏 - 信息面板 ========== */
+        .right-panel {
+            width: 380px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            flex-shrink: 0;
+        }
+
+        /* ========== 卡片通用样式 ========== */
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 18px;
+            transition: all 0.3s ease;
+        }
+
+        .card:hover {
+            border-color: var(--primary-blue);
+            box-shadow: 0 0 15px rgba(0, 102, 204, 0.2);
+        }
+
+        .card-title {
+            font-size: 16px;
+            color: var(--primary-blue);
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .card-title::before {
+            content: '';
+            width: 4px;
+            height: 18px;
+            background: var(--primary-blue);
+            border-radius: 2px;
+        }
+
+        /* ========== 床位录入区 ========== */
+        .bed-input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .bed-input {
+            flex: 1;
+            background: #0a1425;
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            padding: 12px 15px;
+            color: var(--text-primary);
+            font-size: 20px;
+            text-align: center;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        .bed-input:focus {
+            border-color: var(--primary-blue);
+        }
+
+        .btn-confirm {
+            background: var(--primary-blue);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 12px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-confirm:hover {
+            background: #0077ee;
+            transform: translateY(-2px);
+        }
+
+        .current-bed-display {
+            text-align: center;
+            padding: 15px;
+            background: linear-gradient(135deg, #0a2a4a 0%, #0a1628 100%);
+            border-radius: 10px;
+            border: 1px solid var(--primary-blue);
+        }
+
+        .current-bed-display .label {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .current-bed-display .bed-number {
+            font-size: 48px;
+            font-weight: bold;
+            color: var(--primary-blue);
+            text-shadow: 0 0 30px rgba(0, 102, 204, 0.5);
+        }
+
+        /* ========== 路径控制区 ========== */
+        .control-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .btn-control {
+            width: 100%;
+            padding: 14px;
+            font-size: 16px;
+            font-weight: bold;
+            border: 2px solid;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-reset {
+            background: transparent;
+            border-color: var(--warning-yellow);
+            color: var(--warning-yellow);
+        }
+
+        .btn-reset:hover {
+            background: rgba(255, 204, 0, 0.1);
+        }
+
+        .btn-start {
+            background: transparent;
+            border-color: var(--safe-green);
+            color: var(--safe-green);
+        }
+
+        .btn-start:hover {
+            background: rgba(0, 204, 102, 0.1);
+        }
+
+        .btn-start.active {
+            background: var(--safe-green);
+            color: var(--dark-bg);
+        }
+
+        .btn-stop {
+            background: transparent;
+            border-color: var(--danger-red);
+            color: var(--danger-red);
+        }
+
+        .btn-stop:hover {
+            background: rgba(255, 51, 51, 0.1);
+        }
+
+        .btn-stop.active {
+            background: var(--danger-red);
+            color: var(--dark-bg);
+        }
+
+        /* ========== 状态显示区 ========== */
+        .status-display {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 30px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .status-level {
+            font-size: 72px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            transition: all 0.5s ease;
+            text-shadow: 0 0 40px currentColor;
+        }
+
+        .status-label {
+            font-size: 24px;
+            margin-bottom: 20px;
+            color: var(--text-secondary);
+        }
+
+        .status-bed-info {
+            font-size: 18px;
+            padding: 10px 25px;
+            background: rgba(0, 102, 204, 0.1);
+            border-radius: 20px;
+            border: 1px solid var(--border-color);
+        }
+
+        .countdown-timer {
+            font-size: 36px;
+            font-weight: bold;
+            color: var(--primary-blue);
+            margin-top: 20px;
+            font-family: 'Courier New', monospace;
+        }
+
+        /* 状态颜色 */
+        .status-safe { color: var(--safe-green); }
+        .status-sit { color: var(--warning-yellow); }
+        .status-prepare { color: var(--alert-orange); }
+        .status-fall { color: var(--danger-red); }
+
+        /* 背景光晕 */
+        .status-glow {
+            position: absolute;
+            width: 300px;
+            height: 300px;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.3;
+            transition: all 0.5s;
+            pointer-events: none;
+        }
+
+        /* ========== 火柴人Canvas区 ========== */
+        .canvas-container {
+            position: relative;
+            background: #0a1425;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        #skeletonCanvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .canvas-overlay {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 8px 15px;
+            border-radius: 8px;
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .pose-label {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0, 102, 204, 0.8);
+            padding: 8px 15px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        /* ========== 表情区 ========== */
+        .emoji-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 30px;
+            padding: 20px;
+        }
+
+        .emoji-face {
+            width: 100px;
+            height: 100px;
+            position: relative;
+            transition: all 0.5s;
+        }
+
+        .emoji-face svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        .emoji-label {
+            text-align: center;
+            margin-top: 10px;
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        /* ========== 报警面板 ========== */
+        .alarm-list {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .alarm-item {
+            background: #0a1425;
+            border-radius: 8px;
+            padding: 12px;
+            border-left: 4px solid;
+            transition: all 0.3s;
+        }
+
+        .alarm-item.level-safe { border-left-color: var(--safe-green); }
+        .alarm-item.level-sit { border-left-color: var(--warning-yellow); }
+        .alarm-item.level-prepare { border-left-color: var(--alert-orange); }
+        .alarm-item.level-fall { border-left-color: var(--danger-red); }
+
+        .alarm-item:hover {
+            background: #0f1d32;
+            transform: translateX(5px);
+        }
+
+        .alarm-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .alarm-time {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .alarm-bed {
+            font-size: 14px;
+            font-weight: bold;
+            color: var(--primary-blue);
+        }
+
+        .alarm-status {
+            font-size: 13px;
+            padding: 3px 10px;
+            border-radius: 12px;
+            display: inline-block;
+        }
+
+        /* ========== JSON数据面板 ========== */
+        .json-display {
+            background: #0a1425;
+            border-radius: 10px;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            color: #66ddaa;
+            overflow-y: auto;
+            max-height: 200px;
+            line-height: 1.6;
+        }
+
+        .json-key { color: #8899cc; }
+        .json-string { color: #66ddaa; }
+        .json-number { color: #ffaa44; }
+        .json-boolean { color: #ff6688; }
+
+        /* ========== 滚动条样式 ========== */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--dark-bg);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--primary-blue);
+        }
+
+        /* ========== 系统状态栏 ========== */
+        .status-bar {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--safe-green);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* ========== 状态指示灯 ========== */
+        .indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .indicator-green { background: var(--safe-green); box-shadow: 0 0 10px var(--safe-green); }
+        .indicator-yellow { background: var(--warning-yellow); box-shadow: 0 0 10px var(--warning-yellow); }
+        .indicator-orange { background: var(--alert-orange); box-shadow: 0 0 10px var(--alert-orange); }
+        .indicator-red { background: var(--danger-red); box-shadow: 0 0 10px var(--danger-red); }
+
+        /* ========== 快捷床位按钮 ========== */
+        .quick-beds {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 8px;
+            margin-top: 15px;
+        }
+
+        .btn-quick-bed {
+            background: #0a1425;
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 10px 5px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .btn-quick-bed:hover {
+            border-color: var(--primary-blue);
+            background: rgba(0, 102, 204, 0.2);
+        }
+
+        .btn-quick-bed.active {
+            background: var(--primary-blue);
+            border-color: var(--primary-blue);
+        }
+
+        /* ========== MQTT日志面板 ========== */
+        .mqtt-log {
+            background: #0a1425;
+            border-radius: 10px;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            color: var(--text-secondary);
+            overflow-y: auto;
+            flex: 1;
+            line-height: 1.8;
+        }
+
+        .mqtt-log .timestamp {
+            color: #666;
+        }
+
+        .mqtt-log .topic {
+            color: var(--primary-blue);
+        }
+
+        .mqtt-log .payload {
+            color: #66ddaa;
+        }
+
+        /* ========== 动画 ========== */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        .alarm-item {
+            animation: fadeIn 0.3s ease;
+        }
+
+        /* ========== 巡检进度条 ========== */
+        .patrol-progress {
+            margin-top: 15px;
+        }
+
+        .progress-bar {
+            height: 8px;
+            background: #0a1425;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary-blue), var(--safe-green));
+            border-radius: 4px;
+            transition: width 0.5s ease;
+        }
+
+        .progress-info {
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-top: 5px;
+        }
+    </style>
 </head>
 <body>
-<div class="hdr">
-<div class="hdr-l"><div class="logo">AI</div><div class="ht">AI-CARE 智慧病房巡检机器人 - 虚拟仿真</div></div>
-<div class="hdr-r">
-<span><span class="dot dg"></span>系统在线</span>
-<span><span class="dot dg" id="rDot"></span><span id="rTxt">巡检中</span></span>
-<div class="sim-clock">
-<span class="clock-icon" id="clockIcon">🌙</span>
-<div>
-<div class="clock-time" id="simT">22<span class="blink-colon">:</span>00<span class="blink-colon">:</span>00</div>
-<div class="clock-period" id="clockPeriod"><span class="period-name">夜间巡检</span> 高危时段</div>
-</div>
-</div>
-<span>FPS <b id="fps">60</b></span>
-</div>
-</div>
-<div class="mn">
-<div class="map-wrap">
-<div class="map-bar">
-<button id="btnPlay" class="on" onclick="toggleSim()">⏸ 暂停</button>
-<button onclick="setSpd(1)">1x</button>
-<button onclick="setSpd(2)">2x</button>
-<button onclick="setSpd(5)">5x</button>
-<button onclick="resetSim()">↻ 重置</button>
-<button onclick="trigEvt()">⚡ 模拟事件</button>
-<span class="lbl">速度 <span id="spdT">1x</span></span>
-<span class="lbl" style="margin-left:12px">💡 点击病房可召唤机器人前往</span>
-</div>
-<div class="map-box"><canvas id="cv"></canvas></div>
-</div>
-<div class="pnl">
-<div class="sec"><div class="sec-t">机器人实时状态</div>
-<div class="rs-grid">
-<div class="rs-i"><div class="lb">位置</div><div class="vl" id="rsP">--</div></div>
-<div class="rs-i"><div class="lb">速度</div><div class="vl" id="rsS">0 cm/s</div></div>
-<div class="rs-i"><div class="lb">航向角</div><div class="vl" id="rsH">0°</div></div>
-<div class="rs-i"><div class="lb">前方障碍</div><div class="vl" id="rsO">安全</div></div>
-<div class="rs-i"><div class="lb">PID L/R</div><div class="vl" id="rsPID">0/0</div></div>
-<div class="rs-i"><div class="lb">IMU滤波</div><div class="vl" id="rsIMU">0°</div></div>
-</div></div>
-<div class="sec"><div class="sec-t">K230 视觉感知（隐私脱敏）</div>
-<div class="cam"><canvas id="camCv" width="360" height="180"></canvas>
-<div class="cam-tag">● LIVE 32FPS | K230 KPU</div><div class="cam-priv">🔒 隐私脱敏 | 仅传骨骼</div></div></div>
-<div class="sec"><div class="sec-t">当前监控状态</div><div class="alert-box s0" id="aBox">● 安全 - 所有病房正常</div></div>
-<div class="sec"><div class="sec-t">20间病房状态</div><div class="rg" id="rGrid"></div></div>
-<div class="sec"><div class="sec-t">病房详情</div><div class="rd" id="rDet"><h4>点击地图中的病房查看详情</h4></div></div>
-<div class="sec"><div class="sec-t">报警与事件日志</div><div class="log" id="aLog"></div></div>
-<div class="sec"><div class="sec-t">MQTT 报文（护士站推送）</div><div class="mqtt" id="mBox">等待数据...</div></div>
-<div class="sec"><div class="sts">
-<div class="sts-i"><div class="sts-n" id="sP">0</div><div class="sts-l">巡检次数</div></div>
-<div class="sts-i"><div class="sts-n" id="sW">0</div><div class="sts-l">前置预警</div></div>
-<div class="sts-i"><div class="sts-n" id="sA">0</div><div class="sts-l">高级报警</div></div>
-<div class="sts-i"><div class="sts-n" id="sT">0h</div><div class="sts-l">运行时长</div></div>
-</div></div>
-</div>
-</div>
+    <!-- ========== 头部标题栏 ========== -->
+    <div class="header">
+        <div class="header-title">AI-CARE 病房夜间高危巡检机器人</div>
+        <div class="status-bar">
+            <div class="status-item">
+                <span class="status-dot"></span>
+                <span>系统在线</span>
+            </div>
+            <div class="status-item">
+                <span class="status-dot"></span>
+                <span>K230连接正常</span>
+            </div>
+            <div class="status-item">
+                <span class="status-dot"></span>
+                <span>MQTT已连接</span>
+            </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px">
+            <div class="sim-clock">
+                <span class="clock-icon" id="clockIcon">🌙</span>
+                <div>
+                    <div class="clock-time" id="headerTime">22<span class="blink-colon">:</span>00<span class="blink-colon">:</span>00</div>
+                    <div class="clock-period" id="clockPeriod"><span class="period-name">夜间巡检</span> 高危时段</div>
+                </div>
+            </div>
+            <a class="nav-btn" href="simulation.html" title="打开机器人仿真系统">🤖 机器人仿真</a>
+        </div>
+    </div>
 
-<script>
-// ============ 配置 ============
-var ROOM_W = 110, ROOM_H = 90, GAP = 6, CORRIDOR_H = 70;
-var PATROL_SPEED = 1.2, FAST_SPEED = 3.5;
-var D_SAFE=0,D_SIT=1,D_LEAVE=2,D_FALL=3;
-var D_TXT=['安全','起坐','离床预警','坠床警报'];
-var D_CLR=['#00cc66','#ffaa00','#ff8800','#ff3344'];
-var P_SLEEP=0,P_WAKE=1,P_SIT=2,P_LEGS=3,P_STAND=4,P_FALLING=5,P_FALLEN=6;
-var P_TXT=['熟睡','翻身','坐起','离床准备','站立','跌倒中','已跌倒'];
+    <!-- ========== 主容器 ========== -->
+    <div class="main-container">
+        <!-- ========== 左栏 - 控制面板 ========== -->
+        <div class="left-panel">
+            <!-- 床位录入区 -->
+            <div class="card">
+                <div class="card-title">床位号录入</div>
+                <div class="bed-input-group">
+                    <input type="number" class="bed-input" id="bedInput" min="1" max="255" placeholder="1-255" value="1">
+                    <button class="btn-confirm" onclick="confirmBed()">确认</button>
+                </div>
+                <div class="current-bed-display">
+                    <div class="label">当前观测病床</div>
+                    <div class="bed-number" id="currentBedDisplay">001</div>
+                </div>
+                <div class="quick-beds">
+                    <button class="btn-quick-bed active" onclick="selectQuickBed(1)">1</button>
+                    <button class="btn-quick-bed" onclick="selectQuickBed(2)">2</button>
+                    <button class="btn-quick-bed" onclick="selectQuickBed(3)">3</button>
+                    <button class="btn-quick-bed" onclick="selectQuickBed(5)">5</button>
+                    <button class="btn-quick-bed" onclick="selectQuickBed(8)">8</button>
+                    <button class="btn-quick-bed" onclick="selectQuickBed(10)">10</button>
+                    <button class="btn-quick-bed" onclick="selectQuickBed(12)">12</button>
+                    <button class="btn-quick-bed" onclick="selectQuickBed(15)">15</button>
+                    <button class="btn-quick-bed" onclick="selectQuickBed(20)">20</button>
+                    <button class="btn-quick-bed" onclick="selectQuickBed(25)">25</button>
+                </div>
+            </div>
 
-// ============ 全局状态 ============
-var canvas, ctx, camCanvas, camCtx;
-var canvasW, canvasH;
-var rooms = [], robot, patients = [];
-var simOn = true, simTime = 0;
-var clockH=22, clockM=0, clockS=0;
-var selectedRoom = -1;
-var logs = [];
-var stats = {patrols:0,warns:0,alarms:0,runtime:0};
-var fpsCnt=0, fpsTm=0, currentFps=60, lastTs=0;
-var speedMul = 1;
-var mapT = {ox:0,oy:0,s:1};
+            <!-- 路径控制区 -->
+            <div class="card">
+                <div class="card-title">巡检路径控制</div>
+                <div class="control-buttons">
+                    <button class="btn-control btn-reset" onclick="resetPatrol()">
+                        <span>🔄</span> 重置巡检路径
+                    </button>
+                    <button class="btn-control btn-start" id="btnStart" onclick="togglePatrol()">
+                        <span id="startIcon">▶</span> <span id="startText">开始巡检</span>
+                    </button>
+                    <button class="btn-control btn-stop" id="btnStop" onclick="stopPatrol()">
+                        <span>⏹</span> 紧急停止
+                    </button>
+                </div>
+                <div class="patrol-progress">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+                    </div>
+                    <div class="progress-info">
+                        <span>巡检进度</span>
+                        <span id="progressText">0%</span>
+                    </div>
+                </div>
+            </div>
 
-// ============ 初始化 ============
-window.onload = function() {
-    canvas = document.getElementById('cv');
-    ctx = canvas.getContext('2d');
-    camCanvas = document.getElementById('camCv');
-    camCtx = camCanvas.getContext('2d');
-    doResize();
-    window.onresize = doResize;
-    buildRooms();
-    robot = makeRobot();
-    for (var i=0;i<20;i++) patients.push(makePatient(i+1));
-    patients[2].state=P_SIT; patients[2].st=0.5;
-    patients[7].state=P_LEGS; patients[7].st=0.3;
-    patients[14].state=P_WAKE; patients[14].st=0.8;
-    buildGrid();
-    canvas.onclick = onMapClick;
-    requestAnimationFrame(loop);
-};
+            <!-- 系统状态 -->
+            <div class="card">
+                <div class="card-title">系统状态</div>
+                <div style="display: flex; flex-direction: column; gap: 12px;">
+                    <div class="status-item">
+                        <span class="indicator indicator-green"></span>
+                        <span>机器人底盘</span>
+                        <span style="margin-left: auto; color: var(--safe-green);">正常</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="indicator indicator-green"></span>
+                        <span>K230视觉模块</span>
+                        <span style="margin-left: auto; color: var(--safe-green);">正常</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="indicator indicator-green"></span>
+                        <span>MQTT通信</span>
+                        <span style="margin-left: auto; color: var(--safe-green);">正常</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="indicator indicator-green"></span>
+                        <span>激光雷达</span>
+                        <span style="margin-left: auto; color: var(--safe-green);">正常</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="indicator indicator-green"></span>
+                        <span>电池电量</span>
+                        <span style="margin-left: auto; color: var(--safe-green);">87%</span>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-function doResize() {
-    var box = canvas.parentElement;
-    canvas.width = box.clientWidth;
-    canvas.height = box.clientHeight;
-    canvasW = canvas.width;
-    canvasH = canvas.height;
-}
+        <!-- ========== 中栏 - 主显示区 ========== -->
+        <div class="center-panel">
+            <!-- 状态大字显示 -->
+            <div class="card status-display">
+                <div class="status-glow" id="statusGlow"></div>
+                <div class="status-level" id="statusLevel">安全</div>
+                <div class="status-label" id="statusLabel">当前危险等级</div>
+                <div class="status-bed-info">
+                    观测病床: <strong id="statusBed">001</strong> 号
+                </div>
+                <div class="countdown-timer" id="countdownTimer">00:03</div>
+                <div style="margin-top: 15px; font-size: 14px; color: var(--text-secondary);">
+                    下次数据更新倒计时
+                </div>
+            </div>
 
-// ============ 病房布局 ============
-function buildRooms() {
-    rooms = [];
-    var sx=35, sy=30;
-    for (var i=0;i<10;i++) {
-        var x = sx + i*(ROOM_W+GAP);
-        rooms.push({id:i+1, x:x, y:sy, w:ROOM_W, h:ROOM_H,
-            doorX:x+ROOM_W/2, doorY:sy+ROOM_H,
-            bedX:x+15, bedY:sy+20, bedW:75, bedH:40, row:0});
-    }
-    var by = sy + ROOM_H + CORRIDOR_H + 8;
-    for (var i=0;i<10;i++) {
-        var x = sx + i*(ROOM_W+GAP);
-        rooms.push({id:i+11, x:x, y:by, w:ROOM_W, h:ROOM_H,
-            doorX:x+ROOM_W/2, doorY:by,
-            bedX:x+15, bedY:by+20, bedW:75, bedH:40, row:1});
-    }
-}
+            <!-- 火柴人Canvas + 表情区 -->
+            <div style="display: flex; gap: 15px; flex: 1;">
+                <!-- 火柴人展示区 -->
+                <div class="card canvas-container" style="flex: 2;">
+                    <canvas id="skeletonCanvas"></canvas>
+                    <div class="canvas-overlay">
+                        K230 脱敏骨骼数据 - 17关键点
+                    </div>
+                    <div class="pose-label" id="poseLabel">姿态: 平躺</div>
+                </div>
 
-function corridorY() { return 30 + ROOM_H + CORRIDOR_H/2 + 4; }
+                <!-- 表情区 -->
+                <div class="card" style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+                    <div class="card-title" style="width: 100%;">夜间虚拟表情</div>
+                    <div class="emoji-face" id="emojiFace">
+                        <!-- 安全表情 - 微笑 -->
+                        <svg viewBox="0 0 100 100" id="emojiSvg">
+                            <circle cx="50" cy="50" r="45" fill="#00cc66" opacity="0.2" stroke="#00cc66" stroke-width="2"/>
+                            <circle cx="35" cy="40" r="5" fill="#00cc66"/>
+                            <circle cx="65" cy="40" r="5" fill="#00cc66"/>
+                            <path d="M 30 60 Q 50 80 70 60" stroke="#00cc66" stroke-width="3" fill="none" stroke-linecap="round"/>
+                        </svg>
+                    </div>
+                    <div class="emoji-label" id="emojiLabel">安全 - 正常巡检中</div>
+                    <div style="margin-top: 20px; text-align: center;">
+                        <div style="font-size: 48px;" id="emojiIcon">😊</div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-function doorPos(rid) {
-    var r = rooms[rid-1];
-    var cy = corridorY();
-    return r.row===0 ? {x:r.doorX, y:cy-12} : {x:r.doorX, y:cy+12};
-}
+        <!-- ========== 右栏 - 信息面板 ========== -->
+        <div class="right-panel">
+            <!-- 报警信息面板 -->
+            <div class="card" style="flex: 1; display: flex; flex-direction: column;">
+                <div class="card-title">报警信息记录</div>
+                <div class="alarm-list" id="alarmList">
+                    <!-- 动态生成 -->
+                </div>
+            </div>
 
-// ============ 机器人 ============
-function makeRobot() {
-    return {
-        x:55, y:corridorY(), heading:0, speed:0,
-        pidL:0, pidR:0, filtAng:0, ultra:400,
-        targetRoom:1, dir:1,
-        isRunning:true, curRoom:0, checkT:0, CHECK_DUR:2.5,
-        navTarget:null, isNav:false,
-        results: (function(){var a=[];for(var i=0;i<20;i++)a.push({danger:0,lt:0});return a;})(),
-        battery:85
-    };
-}
+            <!-- MQTT数据面板 -->
+            <div class="card" style="flex: 1; display: flex; flex-direction: column;">
+                <div class="card-title">MQTT 数据推送</div>
+                <div class="json-display" id="jsonDisplay">
+                    <!-- 动态生成 -->
+                </div>
+            </div>
 
-// ============ 病人 ============
-function makePatient(rid) {
-    return {rid:rid, state:P_SLEEP, danger:D_SAFE, st:0,
-        thresh:5+Math.random()*15, angle:0, hipH:70, fallV:0,
-        kps:[], bbox:{x:0,y:0,w:0,h:0},
-        evtT:0, nextEvt:5+Math.random()*30};
-}
+            <!-- MQTT日志 -->
+            <div class="card" style="flex: 1; display: flex; flex-direction: column;">
+                <div class="card-title">通信日志</div>
+                <div class="mqtt-log" id="mqttLog">
+                    <!-- 动态生成 -->
+                </div>
+            </div>
+        </div>
+    </div>
 
-// ============ PID ============
-function pidCalc(prev, target, actual) {
-    var KP=2.0, KI=0.05, KD=0.8;
-    var err = target - actual;
-    var integ = Math.abs(err)<1.0 ? KI*err : 0;
-    var du = KP*(err-prev.pe) + integ + KD*(err-2*prev.pe+prev.ppe);
-    prev.ppe = prev.pe; prev.pe = err;
-    prev.out += du;
-    if(prev.out>0&&prev.out<0.05) prev.out=0.05;
-    if(prev.out<0&&prev.out>-0.05) prev.out=-0.05;
-    if(prev.out>1) prev.out=1;
-    if(prev.out<-1) prev.out=-1;
-    return prev.out;
-}
+    <!-- ========== JavaScript ========== -->
+    <script>
+        // ========== 全局状态 ==========
+        const state = {
+            currentBed: 1,
+            isPatrolling: false,
+            patrolProgress: 0,
+            currentStatus: 'safe', // safe, sit, prepare, fall
+            countdown: 3,
+            alarms: [],
+            mqttMessages: [],
+            skeletonPose: 'lying' // lying, sitting, leaving, falling
+        };
 
-// ============ 更新机器人 ============
-function updateRobot(dt) {
-    if(!robot.isRunning && !robot.isNav) return;
+        // 状态配置
+        const statusConfig = {
+            safe: { level: '安全', color: '#00cc66', cssClass: 'status-safe', emoji: '😊', emojiLabel: '安全 - 正常巡检中' },
+            sit: { level: '起坐', color: '#ffcc00', cssClass: 'status-sit', emoji: '😟', emojiLabel: '警戒 - 检测到起坐' },
+            prepare: { level: '离床准备', color: '#ff8800', cssClass: 'status-prepare', emoji: '😨', emojiLabel: '警告 - 离床准备中' },
+            fall: { level: '坠床跌倒', color: '#ff3333', cssClass: 'status-fall', emoji: '🚨', emojiLabel: '危险 - 坠床跌倒报警!' }
+        };
 
-    var spd = robot.isNav ? FAST_SPEED*speedMul : PATROL_SPEED*speedMul;
-    var tx, ty;
+        // 姿态配置
+        const poseConfig = {
+            lying: '平躺',
+            sitting: '坐起',
+            leaving: '离床',
+            falling: '跌倒'
+        };
 
-    if(robot.isNav && robot.navTarget) {
-        tx = robot.navTarget.x;
-        ty = robot.navTarget.y;
-    } else if(robot.curRoom > 0) {
-        // 检查病房中
-        robot.checkT += dt;
-        var p = patients[robot.curRoom-1];
-        robot.results[robot.curRoom-1] = {danger:p.danger, lt:simTime};
-        var rm = rooms[robot.curRoom-1];
-        var oppId = rm.row===0 ? robot.curRoom+10 : robot.curRoom-10;
-        var opp = patients[oppId-1];
-        robot.results[oppId-1] = {danger:opp.danger, lt:simTime};
-        if(robot.checkT >= robot.CHECK_DUR) {
-            robot.checkT = 0;
-            robot.curRoom = 0;
-            if(robot.dir===1) {
-                robot.targetRoom++;
-                if(robot.targetRoom>20){robot.targetRoom=19;robot.dir=-1;stats.patrols++;}
+        // ========== 时间更新 ==========
+        function updateTime() {
+            const now = new Date();
+            const h = String(now.getHours()).padStart(2, '0');
+            const m = String(now.getMinutes()).padStart(2, '0');
+            const s = String(now.getSeconds()).padStart(2, '0');
+            document.getElementById('headerTime').innerHTML = h + '<span class="blink-colon">:</span>' + m + '<span class="blink-colon">:</span>' + s;
+
+            // 更新时段图标和文字
+            const hour = now.getHours();
+            let icon = '🌙', period = '夜间巡检', sub = '高危时段';
+            if (hour >= 5 && hour < 7) { icon = '🌅'; period = '清晨'; sub = '天色渐亮'; }
+            else if (hour >= 7 && hour < 9) { icon = '☀️'; period = '早晨'; sub = '交班时段'; }
+            else if (hour >= 9 && hour < 12) { icon = '☀️'; period = '上午'; sub = '日间巡查'; }
+            else if (hour >= 12 && hour < 14) { icon = '🌤️'; period = '中午'; sub = '午间休息'; }
+            else if (hour >= 14 && hour < 17) { icon = '☀️'; period = '下午'; sub = '日间巡查'; }
+            else if (hour >= 17 && hour < 19) { icon = '🌇'; period = '傍晚'; sub = '交接时段'; }
+            else if (hour >= 19 && hour < 22) { icon = '🌆'; period = '夜间'; sub = '就寝准备'; }
+            document.getElementById('clockIcon').textContent = icon;
+            document.getElementById('clockPeriod').innerHTML = '<span class="period-name">' + period + '</span> ' + sub;
+        }
+
+        setInterval(updateTime, 1000);
+        updateTime();
+
+        // ========== 床位控制 ==========
+        function confirmBed() {
+            const input = document.getElementById('bedInput');
+            let bedNum = parseInt(input.value);
+
+            if (isNaN(bedNum) || bedNum < 1 || bedNum > 255) {
+                alert('请输入有效的床位号 (1-255)');
+                return;
+            }
+
+            state.currentBed = bedNum;
+            updateBedDisplay();
+            addMqttLog('bed/set', JSON.stringify({ bed_id: bedNum }));
+        }
+
+        function selectQuickBed(num) {
+            state.currentBed = num;
+            document.getElementById('bedInput').value = num;
+            updateBedDisplay();
+
+            // 更新快捷按钮状态
+            document.querySelectorAll('.btn-quick-bed').forEach(btn => {
+                btn.classList.toggle('active', parseInt(btn.textContent) === num);
+            });
+
+            addMqttLog('bed/set', JSON.stringify({ bed_id: num }));
+        }
+
+        function updateBedDisplay() {
+            const display = document.getElementById('currentBedDisplay');
+            const statusBed = document.getElementById('statusBed');
+            display.textContent = String(state.currentBed).padStart(3, '0');
+            statusBed.textContent = String(state.currentBed).padStart(3, '0');
+        }
+
+        // ========== 巡检控制 ==========
+        function resetPatrol() {
+            state.patrolProgress = 0;
+            state.isPatrolling = false;
+            updatePatrolUI();
+            addMqttLog('patrol/reset', JSON.stringify({ action: 'reset' }));
+            addAlarm('safe', '巡检路径已重置');
+        }
+
+        function togglePatrol() {
+            state.isPatrolling = !state.isPatrolling;
+            updatePatrolUI();
+            addMqttLog('patrol/toggle', JSON.stringify({ running: state.isPatrolling }));
+        }
+
+        function stopPatrol() {
+            state.isPatrolling = false;
+            state.patrolProgress = 0;
+            updatePatrolUI();
+            addMqttLog('patrol/stop', JSON.stringify({ action: 'emergency_stop' }));
+            addAlarm('safe', '紧急停止已触发');
+        }
+
+        function updatePatrolUI() {
+            const btnStart = document.getElementById('btnStart');
+            const startIcon = document.getElementById('startIcon');
+            const startText = document.getElementById('startText');
+
+            if (state.isPatrolling) {
+                btnStart.classList.add('active');
+                startIcon.textContent = '⏸';
+                startText.textContent = '暂停巡检';
             } else {
-                robot.targetRoom--;
-                if(robot.targetRoom<1){robot.targetRoom=2;robot.dir=1;stats.patrols++;}
+                btnStart.classList.remove('active');
+                startIcon.textContent = '▶';
+                startText.textContent = '开始巡检';
             }
         }
-        robot.speed = 0;
-        return;
-    } else {
-        var wp = doorPos(robot.targetRoom);
-        tx = wp.x; ty = wp.y;
-    }
 
-    var dx = tx - robot.x;
-    var dy = ty - robot.y;
-    var dist = Math.sqrt(dx*dx + dy*dy);
+        // ========== 状态更新 ==========
+        function updateStatus(newStatus) {
+            state.currentStatus = newStatus;
+            const config = statusConfig[newStatus];
 
-    // 到达
-    if(dist < 8) {
-        if(robot.isNav) {
-            robot.isNav = false;
-            robot.navTarget = null;
+            // 更新状态大字
+            const statusLevel = document.getElementById('statusLevel');
+            statusLevel.textContent = config.level;
+            statusLevel.className = 'status-level ' + config.cssClass;
+
+            // 更新背景光晕
+            const glow = document.getElementById('statusGlow');
+            glow.style.background = config.color;
+
+            // 更新表情
+            updateEmoji(newStatus);
+
+            // 更新火柴人姿态
+            const poseMap = { safe: 'lying', sit: 'sitting', prepare: 'leaving', fall: 'falling' };
+            state.skeletonPose = poseMap[newStatus];
+            document.getElementById('poseLabel').textContent = '姿态: ' + poseConfig[state.skeletonPose];
+
+            // 如果是危险状态，添加报警
+            if (newStatus === 'fall') {
+                addAlarm(newStatus, '检测到坠床跌倒!');
+            } else if (newStatus === 'prepare') {
+                addAlarm(newStatus, '检测到离床准备');
+            }
         }
-        robot.curRoom = robot.targetRoom;
-        robot.checkT = 0;
-        robot.speed = 0;
-        return;
-    }
 
-    // 直接移动（简化PID为平滑插值）
-    var moveSpd = spd;
-    if(dist < 30) moveSpd = spd * (dist/30) * 0.5 + spd*0.3; // 减速接近
+        function updateEmoji(status) {
+            const config = statusConfig[status];
+            document.getElementById('emojiLabel').textContent = config.emojiLabel;
+            document.getElementById('emojiIcon').textContent = config.emoji;
 
-    var tgtH = Math.atan2(dy, dx);
-    var hErr = tgtH - robot.heading;
-    while(hErr>Math.PI) hErr-=2*Math.PI;
-    while(hErr<-Math.PI) hErr+=2*Math.PI;
+            // 更新SVG表情
+            const svg = document.getElementById('emojiSvg');
+            const color = config.color;
 
-    // 平滑转向
-    robot.heading += hErr * 0.15;
-
-    // 互补滤波模拟
-    robot.filtAng = 0.98*(robot.filtAng + hErr*3*dt) + 0.02*tgtH;
-
-    // PID输出模拟
-    var lTgt = moveSpd + hErr*0.3;
-    var rTgt = moveSpd - hErr*0.3;
-    if(!robot._pidL) robot._pidL={pe:0,ppe:0,out:0};
-    if(!robot._pidR) robot._pidR={pe:0,ppe:0,out:0};
-    robot.pidL = pidCalc(robot._pidL, lTgt, robot.speed);
-    robot.pidR = pidCalc(robot._pidR, rTgt, robot.speed);
-
-    robot.speed = (robot.pidL + robot.pidR) * 0.5 * moveSpd;
-    if(robot.speed < 0.1) robot.speed = 0.1;
-
-    robot.x += Math.cos(robot.heading) * robot.speed;
-    robot.y += Math.sin(robot.heading) * robot.speed;
-
-    robot.ultra = dist*1.5 + 20;
-    robot.battery = Math.max(0, robot.battery - dt*0.001);
-}
-
-// ============ 病人FSM ============
-function updatePatient(p, dt) {
-    p.st += dt;
-    p.evtT += dt;
-    if(p.evtT >= p.nextEvt) {
-        p.evtT = 0;
-        p.nextEvt = 8+Math.random()*40;
-        if(p.state===P_SLEEP && Math.random()<0.3) {p.state=P_WAKE;p.st=0;p.thresh=0.5+Math.random();}
-    }
-    switch(p.state) {
-        case P_SLEEP:
-            p.angle=Math.random()*5; p.hipH=70+Math.random()*3; p.fallV=0; p.danger=D_SAFE; break;
-        case P_WAKE:
-            p.angle=10+Math.random()*15; p.hipH=68+Math.random()*4; p.danger=D_SAFE;
-            if(p.st>=p.thresh){p.state=P_SIT;p.st=0;p.thresh=1+Math.random();} break;
-        case P_SIT:
-            p.angle=45+Math.random()*20; p.hipH=55+Math.random()*5;
-            if(p.st>=1.0) p.danger=D_SIT;
-            if(p.st>=p.thresh){
-                if(Math.random()<0.5){p.state=P_LEGS;p.st=0;p.thresh=0.5+Math.random()*1.5;}
-                else{p.state=P_SLEEP;p.st=0;p.danger=D_SAFE;}
-            } break;
-        case P_LEGS:
-            p.angle=60+Math.random()*25; p.hipH=45+Math.random()*5; p.danger=D_LEAVE;
-            if(p.st>=p.thresh){
-                if(Math.random()<0.35){p.state=P_STAND;p.st=0;p.thresh=1+Math.random();}
-                else{p.state=P_STAND;p.st=0;p.thresh=3+Math.random()*5;}
-            } break;
-        case P_STAND:
-            p.angle=75+Math.random()*15;
-            if(p.st>1.5&&Math.random()<0.02){p.state=P_FALLING;p.st=0;p.fallV=0;}
-            if(p.st>=p.thresh&&p.state!==P_FALLING){p.state=P_SLEEP;p.st=0;p.danger=D_SAFE;} break;
-        case P_FALLING:
-            p.fallV+=9.8*dt*20; p.hipH-=p.fallV*dt; p.danger=D_FALL;
-            if(p.hipH<=20||p.st>0.8){
-                p.state=P_FALLEN;p.st=0;p.hipH=20;p.fallV=0;
-                addLog(p.rid,'坠床/跌倒！高级危态警报','d');stats.alarms++;sendMQTT(p);
-            } break;
-        case P_FALLEN:
-            p.danger=D_FALL;p.hipH=20;
-            if(p.st>10){p.state=P_SLEEP;p.st=0;p.danger=D_SAFE;addLog(p.rid,'医护人员已到场','s');} break;
-    }
-    genKps(p);
-}
-
-function genKps(p) {
-    var cx=60,cy=50, a=p.angle*Math.PI/180;
-    var hy=cy+15-(70-p.hipH)*0.5;
-    var hx=cx-15*Math.sin(a), headY=hy-30*Math.cos(a);
-    var kp=[];
-    kp.push({x:hx,y:headY,c:.95},{x:hx-4,y:headY-3,c:.9},{x:hx+4,y:headY-3,c:.9},{x:hx-7,y:headY,c:.85},{x:hx+7,y:headY,c:.85});
-    var sy=hy-18*Math.cos(a), sx=cx-8*Math.sin(a);
-    kp.push({x:sx-12,y:sy,c:.92},{x:sx+12,y:sy,c:.92});
-    kp.push({x:sx-18,y:sy+10*Math.cos(a),c:.88},{x:sx+18,y:sy+10*Math.cos(a),c:.88});
-    kp.push({x:sx-22,y:sy+18*Math.cos(a),c:.82},{x:sx+22,y:sy+18*Math.cos(a),c:.82});
-    kp.push({x:cx-8,y:hy,c:.93},{x:cx+8,y:hy,c:.93});
-    var ky=hy+15*Math.cos(a), ks=p.state>=P_LEGS?12:6;
-    kp.push({x:cx-ks,y:ky,c:.9},{x:cx+ks,y:ky,c:.9});
-    var ay=ky+15*Math.cos(a), as2=p.state>=P_LEGS?15:5;
-    kp.push({x:cx-as2,y:ay,c:.85},{x:cx+as2,y:ay,c:.85});
-    p.kps=kp;
-    var x1=999,y1=999,x2=0,y2=0;
-    for(var i=0;i<kp.length;i++){var q=kp[i];if(q.x<x1)x1=q.x;if(q.y<y1)y1=q.y;if(q.x>x2)x2=q.x;if(q.y>y2)y2=q.y;}
-    p.bbox={x:x1-2,y:y1-2,w:x2-x1+4,h:y2-y1+4};
-}
-
-// ============ 渲染地图 ============
-function renderMap() {
-    var W=canvasW, H=canvasH;
-    // 清空
-    ctx.clearRect(0,0,W,H);
-    ctx.fillStyle='#040810';
-    ctx.fillRect(0,0,W,H);
-
-    if(W<100||H<100) return;
-
-    var mapW=10*(ROOM_W+GAP)+80;
-    var mapH=ROOM_H*2+CORRIDOR_H+80;
-    var sc=Math.min((W-16)/mapW,(H-16)/mapH);
-    var ox=(W-mapW*sc)/2, oy=(H-mapH*sc)/2;
-    mapT={ox:ox,oy:oy,s:sc};
-
-    ctx.save();
-    ctx.translate(ox,oy);
-    ctx.scale(sc,sc);
-
-    var cy=corridorY();
-
-    // 走廊
-    ctx.fillStyle='#0a1218';
-    ctx.fillRect(20,cy-CORRIDOR_H/2,mapW-40,CORRIDOR_H);
-    ctx.strokeStyle='#152030';ctx.setLineDash([6,6]);ctx.lineWidth=1;
-    ctx.beginPath();ctx.moveTo(20,cy);ctx.lineTo(mapW-60,cy);ctx.stroke();ctx.setLineDash([]);
-
-    // 护士站
-    var nx=mapW-50, ny=cy-30;
-    ctx.fillStyle='#0a1a30';ctx.fillRect(nx,ny,120,60);
-    ctx.strokeStyle='#0088ff';ctx.lineWidth=1.5;ctx.strokeRect(nx,ny,120,60);
-    ctx.fillStyle='#0088ff';ctx.font='bold 11px Microsoft YaHei';ctx.textAlign='center';
-    ctx.fillText('🏥 护士站',nx+60,ny+16);
-    ctx.fillStyle='#4488aa';ctx.font='9px Microsoft YaHei';
-    ctx.fillText('巡检:'+stats.patrols+' 预警:'+stats.warns,nx+60,ny+32);
-    ctx.fillText('运行 '+Math.floor(stats.runtime/60)+'h'+Math.floor(stats.runtime%60)+'m',nx+60,ny+46);
-
-    // 病房
-    for(var i=0;i<rooms.length;i++){
-        var rm=rooms[i], p=patients[rm.id-1], res=robot.results[rm.id-1];
-        var dg=res.danger;
-
-        ctx.fillStyle=dg===D_FALL?'rgba(255,51,68,.1)':dg===D_LEAVE?'rgba(255,136,0,.06)':dg===D_SIT?'rgba(255,170,0,.04)':'#081018';
-        ctx.fillRect(rm.x,rm.y,rm.w,rm.h);
-        ctx.strokeStyle=dg>=D_FALL?'#ff3344':dg>=D_SIT?'#ffaa00':'#152535';
-        ctx.lineWidth=dg>=D_FALL?2:1;
-        ctx.strokeRect(rm.x,rm.y,rm.w,rm.h);
-
-        ctx.fillStyle='#1a3050';
-        ctx.fillRect(rm.doorX-6,rm.doorY-2,12,4);
-
-        ctx.fillStyle='#12202e';ctx.fillRect(rm.bedX,rm.bedY,rm.bedW,rm.bedH);
-        ctx.strokeStyle='#1a3045';ctx.lineWidth=1;ctx.strokeRect(rm.bedX,rm.bedY,rm.bedW,rm.bedH);
-        ctx.fillStyle='#1a2838';ctx.fillRect(rm.bedX+2,rm.bedY+2,16,10);
-
-        drawPatient(ctx,rm,p);
-
-        ctx.fillStyle='#4488aa';ctx.font='bold 10px Microsoft YaHei';ctx.textAlign='left';
-        ctx.fillText(rm.id+'号',rm.x+3,rm.y+11);
-        ctx.beginPath();ctx.arc(rm.x+rm.w-8,rm.y+8,3,0,Math.PI*2);
-        ctx.fillStyle=dg>=D_FALL?'#ff3344':dg>=D_LEAVE?'#ff8800':dg>=D_SIT?'#ffaa00':'#00cc66';ctx.fill();
-
-        if(robot.curRoom===rm.id){
-            ctx.strokeStyle='#0088ff';ctx.lineWidth=2;ctx.setLineDash([3,3]);
-            ctx.strokeRect(rm.x-2,rm.y-2,rm.w+4,rm.h+4);ctx.setLineDash([]);
+            if (status === 'safe') {
+                svg.innerHTML = `
+                    <circle cx="50" cy="50" r="45" fill="${color}" opacity="0.2" stroke="${color}" stroke-width="2"/>
+                    <circle cx="35" cy="40" r="5" fill="${color}"/>
+                    <circle cx="65" cy="40" r="5" fill="${color}"/>
+                    <path d="M 30 60 Q 50 80 70 60" stroke="${color}" stroke-width="3" fill="none" stroke-linecap="round"/>
+                `;
+            } else if (status === 'sit') {
+                svg.innerHTML = `
+                    <circle cx="50" cy="50" r="45" fill="${color}" opacity="0.2" stroke="${color}" stroke-width="2"/>
+                    <circle cx="35" cy="40" r="5" fill="${color}"/>
+                    <circle cx="65" cy="40" r="5" fill="${color}"/>
+                    <line x1="30" y1="65" x2="70" y2="65" stroke="${color}" stroke-width="3" stroke-linecap="round"/>
+                `;
+            } else if (status === 'prepare') {
+                svg.innerHTML = `
+                    <circle cx="50" cy="50" r="45" fill="${color}" opacity="0.2" stroke="${color}" stroke-width="2"/>
+                    <circle cx="35" cy="38" r="6" fill="${color}"/>
+                    <circle cx="65" cy="38" r="6" fill="${color}"/>
+                    <path d="M 30 65 Q 50 55 70 65" stroke="${color}" stroke-width="3" fill="none" stroke-linecap="round"/>
+                `;
+            } else {
+                svg.innerHTML = `
+                    <circle cx="50" cy="50" r="45" fill="${color}" opacity="0.3" stroke="${color}" stroke-width="3"/>
+                    <line x1="30" y1="35" x2="40" y2="45" stroke="${color}" stroke-width="3" stroke-linecap="round"/>
+                    <line x1="40" y1="35" x2="30" y2="45" stroke="${color}" stroke-width="3" stroke-linecap="round"/>
+                    <line x1="60" y1="35" x2="70" y2="45" stroke="${color}" stroke-width="3" stroke-linecap="round"/>
+                    <line x1="70" y1="35" x2="60" y2="45" stroke="${color}" stroke-width="3" stroke-linecap="round"/>
+                    <circle cx="50" cy="65" r="8" fill="none" stroke="${color}" stroke-width="3"/>
+                    <line x1="50" y1="57" x2="50" y2="53" stroke="${color}" stroke-width="3"/>
+                `;
+            }
         }
-        if(selectedRoom===rm.id){
-            ctx.strokeStyle='#00ccff';ctx.lineWidth=2;
-            ctx.strokeRect(rm.x-3,rm.y-3,rm.w+6,rm.h+6);
+
+        // ========== 报警记录 ==========
+        function addAlarm(level, message) {
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString('zh-CN');
+
+            const alarm = {
+                time: timeStr,
+                bed: state.currentBed,
+                level: level,
+                message: message,
+                statusCode: getStatusCode(level)
+            };
+
+            state.alarms.unshift(alarm);
+            if (state.alarms.length > 20) state.alarms.pop();
+
+            renderAlarms();
+            updateJsonDisplay();
         }
-    }
 
-    // 机器人
-    drawRobot(ctx);
-
-    ctx.fillStyle='#1a3050';ctx.font='9px Microsoft YaHei';ctx.textAlign='center';
-    ctx.fillText('← 入口',50,cy-CORRIDOR_H/2-4);
-    ctx.fillText('机器人巡航通道',mapW/2-40,cy+4);
-
-    ctx.restore();
-}
-
-function drawPatient(c,rm,p) {
-    if(p.state===P_SLEEP&&Math.random()<0.7) return;
-    var bx=rm.bedX+rm.bedW/2, by=rm.bedY+rm.bedH/2;
-    c.save();c.translate(bx,by);c.rotate(p.angle*Math.PI/180*0.8);
-    c.strokeStyle='#3a6080';c.lineWidth=1.5;c.lineCap='round';
-    c.beginPath();c.arc(-12,-4,4,0,Math.PI*2);c.stroke();
-    c.beginPath();c.moveTo(-8,0);c.lineTo(12,2);c.stroke();
-    if(p.state>=P_SIT){
-        c.beginPath();c.moveTo(12,2);c.lineTo(8,10);c.lineTo(4,16);c.stroke();
-        c.beginPath();c.moveTo(12,2);c.lineTo(15,10);c.lineTo(18,16);c.stroke();
-    } else {
-        c.beginPath();c.moveTo(12,2);c.lineTo(26,3);c.stroke();
-    }
-    if(p.danger>D_SAFE){
-        c.fillStyle=D_CLR[p.danger];c.font='7px Microsoft YaHei';c.textAlign='center';
-        c.fillText(D_TXT[p.danger],0,-14);
-    }
-    c.restore();
-}
-
-function drawRobot(c) {
-    c.save();c.translate(robot.x,robot.y);c.rotate(robot.heading);
-    var r=14;
-    c.fillStyle='rgba(0,136,255,.04)';
-    c.beginPath();c.moveTo(0,0);c.arc(0,0,30,-.4,.4);c.closePath();c.fill();
-    c.fillStyle='#1a2a3a';c.beginPath();c.arc(0,0,r,0,Math.PI*2);c.fill();
-    c.strokeStyle='#0088ff';c.lineWidth=1.5;c.beginPath();c.arc(0,0,r,0,Math.PI*2);c.stroke();
-    c.fillStyle='#0d1a28';c.beginPath();c.arc(0,0,r-3,0,Math.PI*2);c.fill();
-    c.fillStyle='#224466';c.beginPath();c.arc(0,-2,4,0,Math.PI*2);c.fill();
-    c.strokeStyle='#0088ff';c.lineWidth=1;c.beginPath();c.arc(0,-2,4,0,Math.PI*2);c.stroke();
-    c.fillStyle='#0088ff';
-    c.beginPath();c.moveTo(0,-r-3);c.lineTo(-3,-r);c.lineTo(3,-r);c.closePath();c.fill();
-    var bp=(Date.now()/500)%2;
-    c.beginPath();c.arc(-r+4,-r+4,1.5,0,Math.PI*2);
-    c.fillStyle=bp>1?'#00cc66':'#006633';c.fill();
-    c.restore();
-
-    if(robot.isRunning||robot.isNav){
-        var wp=(Date.now()/200)%3;
-        c.strokeStyle='rgba(0,136,255,'+(0.25-wp*0.08)+')';c.lineWidth=1;
-        c.beginPath();c.arc(robot.x,robot.y,8+wp*8,robot.heading-0.3,robot.heading+0.3);c.stroke();
-    }
-}
-
-// ============ 摄像头渲染 ============
-function renderCam() {
-    var W=camCanvas.width, H=camCanvas.height;
-    camCtx.clearRect(0,0,W,H);
-    camCtx.fillStyle='#060a10';camCtx.fillRect(0,0,W,H);
-    var sy=(Date.now()/50)%H;
-    camCtx.strokeStyle='rgba(0,136,255,.08)';camCtx.lineWidth=1;
-    camCtx.beginPath();camCtx.moveTo(0,sy);camCtx.lineTo(W,sy);camCtx.stroke();
-    camCtx.strokeStyle='rgba(0,136,255,.02)';camCtx.lineWidth=0.5;
-    for(var x=0;x<W;x+=20){camCtx.beginPath();camCtx.moveTo(x,0);camCtx.lineTo(x,H);camCtx.stroke();}
-    for(var y=0;y<H;y+=20){camCtx.beginPath();camCtx.moveTo(0,y);camCtx.lineTo(W,y);camCtx.stroke();}
-
-    var ap=null;
-    if(robot.curRoom>0) ap=patients[robot.curRoom-1];
-
-    if(ap&&ap.kps.length===17){
-        var sx2=W/120,sy2=H/100;
-        var conn=[[5,6],[5,7],[7,9],[6,8],[8,10],[5,11],[6,12],[11,12],[11,13],[13,15],[12,14],[14,16],[0,1],[0,2],[1,3],[2,4]];
-        camCtx.strokeStyle='#00cc66';camCtx.lineWidth=2;camCtx.lineCap='round';
-        for(var i=0;i<conn.length;i++){var a=conn[i][0],b=conn[i][1];
-            if(ap.kps[a].c>.5&&ap.kps[b].c>.5){camCtx.beginPath();camCtx.moveTo(ap.kps[a].x*sx2,ap.kps[a].y*sy2);camCtx.lineTo(ap.kps[b].x*sx2,ap.kps[b].y*sy2);camCtx.stroke();}}
-        for(var i=0;i<17;i++){if(ap.kps[i].c>.5){camCtx.beginPath();camCtx.arc(ap.kps[i].x*sx2,ap.kps[i].y*sy2,3,0,Math.PI*2);camCtx.fillStyle='#00ff88';camCtx.fill();}}
-        camCtx.strokeStyle=D_CLR[ap.danger];camCtx.lineWidth=1;camCtx.setLineDash([4,2]);
-        camCtx.strokeRect(ap.bbox.x*sx2,ap.bbox.y*sy2,ap.bbox.w*sx2,ap.bbox.h*sy2);camCtx.setLineDash([]);
-        camCtx.fillStyle=D_CLR[ap.danger];camCtx.font='bold 11px Consolas';camCtx.textAlign='left';
-        camCtx.fillText('状态: '+D_TXT[ap.danger],6,H-28);
-        camCtx.fillText('病房: '+robot.curRoom+'号',6,H-12);
-        camCtx.fillStyle='#88aacc';camCtx.font='9px Consolas';
-        camCtx.fillText('θ='+ap.angle.toFixed(1)+'° H='+ap.hipH.toFixed(0),W-100,H-28);
-        camCtx.fillText('框:'+ap.bbox.w.toFixed(0)+'×'+ap.bbox.h.toFixed(0),W-100,H-12);
-    } else {
-        camCtx.fillStyle='#224466';camCtx.font='13px Microsoft YaHei';camCtx.textAlign='center';
-        camCtx.fillText('巡航中... 扫描走廊环境',W/2,H/2);
-        camCtx.strokeStyle='rgba(0,136,255,.12)';camCtx.lineWidth=1;
-        for(var i=0;i<5;i++){var y=H/2-20+i*10;camCtx.beginPath();camCtx.moveTo(W*0.2,y);camCtx.lineTo(W*0.8,y);camCtx.stroke();}
-    }
-    camCtx.fillStyle='rgba(0,204,102,.7)';camCtx.font='8px Consolas';camCtx.textAlign='left';
-    camCtx.fillText('K230 KPU | '+currentFps+'FPS | INT8+FP16',6,14);
-}
-
-// ============ 主循环 ============
-function loop(ts) {
-    if(!lastTs) lastTs=ts;
-    var raw=(ts-lastTs)/1000; lastTs=ts;
-    fpsCnt++;fpsTm+=raw;
-    if(fpsTm>=1){currentFps=fpsCnt;fpsCnt=0;fpsTm=0;}
-    document.getElementById('fps').textContent=currentFps;
-
-    if(simOn){
-        var dt=1/60;
-        simTime+=dt; stats.runtime=simTime;
-        clockS+=dt;
-        if(clockS>=60){clockS-=60;clockM++;}
-        if(clockM>=60){clockM-=60;clockH++;}
-        if(clockH>=24) clockH=0;
-        updateRobot(dt);
-        for(var i=0;i<patients.length;i++) updatePatient(patients[i],dt);
-        updateUI();
-    }
-
-    renderMap();
-    renderCam();
-    requestAnimationFrame(loop);
-}
-
-// ============ UI更新 ============
-function updateUI() {
-    // 更新仿真时钟
-    var h=p2(clockH), m=p2(clockM), s=p2(Math.floor(clockS));
-    document.getElementById('simT').innerHTML=h+'<span class="blink-colon">:</span>'+m+'<span class="blink-colon">:</span>'+s;
-
-    // 更新时段图标和文字
-    var icon='🌙', period='夜间巡检', sub='高危时段';
-    if(clockH>=5&&clockH<7){icon='🌅';period='清晨';sub='天色渐亮';}
-    else if(clockH>=7&&clockH<9){icon='☀️';period='早晨';sub='交班时段';}
-    else if(clockH>=9&&clockH<12){icon='☀️';period='上午';sub='日间巡查';}
-    else if(clockH>=12&&clockH<14){icon='🌤️';period='中午';sub='午间休息';}
-    else if(clockH>=14&&clockH<17){icon='☀️';period='下午';sub='日间巡查';}
-    else if(clockH>=17&&clockH<19){icon='🌇';period='傍晚';sub='交接时段';}
-    else if(clockH>=19&&clockH<22){icon='🌆';period='夜间';sub='就寝准备';}
-    else{icon='🌙';period='夜间巡检';sub='高危时段';}
-    document.getElementById('clockIcon').textContent=icon;
-    document.getElementById('clockPeriod').innerHTML='<span class="period-name">'+period+'</span> '+sub;
-    if(robot.curRoom>0) document.getElementById('rsP').textContent=robot.curRoom+'号 检查中';
-    else if(robot.isNav) document.getElementById('rsP').textContent='→ '+robot.targetRoom+'号 快速前往';
-    else document.getElementById('rsP').textContent='巡航 → '+robot.targetRoom+'号';
-    document.getElementById('rsS').textContent=(robot.speed*8).toFixed(1)+' cm/s';
-    document.getElementById('rsH').textContent=(robot.heading*180/Math.PI).toFixed(1)+'°';
-    document.getElementById('rsO').textContent=robot.ultra<30?'⚠ '+robot.ultra.toFixed(0)+'cm':'安全 ('+robot.ultra.toFixed(0)+'cm)';
-    document.getElementById('rsPID').textContent=robot.pidL.toFixed(2)+'/'+robot.pidR.toFixed(2);
-    document.getElementById('rsIMU').textContent=(robot.filtAng*180/Math.PI).toFixed(1)+'°';
-
-    var md=D_SAFE;
-    for(var i=0;i<patients.length;i++) if(patients[i].danger>md) md=patients[i].danger;
-    var ab=document.getElementById('aBox');
-    ab.className='alert-box s'+md;
-    ab.textContent=md===D_SAFE?'● 安全 - 所有病房正常':(md===D_FALL?'🚨 ':'⚠ ')+D_TXT[md]+' - 存在高危状态';
-
-    for(var i=0;i<20;i++){
-        var b=document.getElementById('rb'+(i+1));
-        if(!b)continue;
-        var dg=robot.results[i].danger;
-        b.className='rb '+(dg>=D_FALL?'dng':dg>=D_SIT?'wrn':'ok')+(selectedRoom===i+1?' sel':'');
-        b.querySelector('.rs').textContent=D_TXT[dg];
-    }
-
-    document.getElementById('sP').textContent=stats.patrols;
-    document.getElementById('sW').textContent=stats.warns;
-    document.getElementById('sA').textContent=stats.alarms;
-    document.getElementById('sT').textContent=Math.floor(stats.runtime/60)+'h';
-
-    var dot=document.getElementById('rDot');
-    dot.className='dot '+(md>=D_FALL?'dr':md>=D_SIT?'dy':'dg');
-    document.getElementById('rTxt').textContent=md>=D_FALL?'⚠ 坠床警报':md>=D_SIT?'预警中':'巡检中';
-
-    updateDetail();
-}
-
-function updateDetail() {
-    var el=document.getElementById('rDet');
-    if(selectedRoom<0){el.innerHTML='<h4>点击地图中的病房查看详情</h4>';return;}
-    var p=patients[selectedRoom-1], r=robot.results[selectedRoom-1];
-    el.innerHTML='<h4>'+selectedRoom+'号病房 实时状态</h4>'+
-    '<div class="rd-r"><span class="k">病人状态</span><span class="v" style="color:'+D_CLR[p.danger]+'">'+P_TXT[p.state]+'</span></div>'+
-    '<div class="rd-r"><span class="k">FSM码</span><span class="v">0x0'+p.danger+' ('+D_TXT[p.danger]+')</span></div>'+
-    '<div class="rd-r"><span class="k">肩髋夹角</span><span class="v">'+p.angle.toFixed(1)+'°</span></div>'+
-    '<div class="rd-r"><span class="k">髋部高度</span><span class="v">'+p.hipH.toFixed(0)+'px</span></div>'+
-    '<div class="rd-r"><span class="k">下落速度</span><span class="v">'+p.fallV.toFixed(2)+' m/s</span></div>'+
-    '<div class="rd-r"><span class="k">骨骼框</span><span class="v">'+p.bbox.w.toFixed(0)+'×'+p.bbox.h.toFixed(0)+'</span></div>'+
-    '<div class="rd-r"><span class="k">上次检查</span><span class="v">'+(r.lt>0?fmtT(r.lt):'未检查')+'</span></div>'+
-    '<div class="rd-r"><span class="k">状态持续</span><span class="v">'+p.st.toFixed(1)+'s</span></div>';
-}
-
-// ============ 网格 ============
-function buildGrid() {
-    var g=document.getElementById('rGrid'); g.innerHTML='';
-    for(var i=1;i<=20;i++){
-        var d=document.createElement('div');
-        d.className='rb ok'; d.id='rb'+i;
-        d.innerHTML='<div class="rn">'+i+'</div><div class="rs">安全</div>';
-        d.onclick=(function(id){return function(){roomClick(id);};})(i);
-        g.appendChild(d);
-    }
-}
-
-// ============ 事件 ============
-function roomClick(id) {
-    selectedRoom=selectedRoom===id?-1:id;
-    if(selectedRoom>0) summonRobot(id);
-}
-
-function onMapClick(e) {
-    var rect=canvas.getBoundingClientRect();
-    var mx=e.clientX-rect.left, my=e.clientY-rect.top;
-    var mx2=(mx-mapT.ox)/mapT.s, my2=(my-mapT.oy)/mapT.s;
-    for(var i=0;i<rooms.length;i++){
-        var rm=rooms[i];
-        if(mx2>=rm.x&&mx2<=rm.x+rm.w&&my2>=rm.y&&my2<=rm.y+rm.h){
-            selectedRoom=selectedRoom===rm.id?-1:rm.id;
-            if(selectedRoom>0) summonRobot(rm.id);
-            return;
+        function getStatusCode(level) {
+            const codes = { safe: 0, sit: 1, prepare: 2, fall: 3 };
+            return codes[level] || 0;
         }
-    }
-    selectedRoom=-1;
-}
 
-function summonRobot(rid) {
-    var pos=doorPos(rid);
-    robot.navTarget={x:pos.x,y:pos.y,rid:rid};
-    robot.targetRoom=rid;
-    robot.isNav=true;
-    robot.curRoom=0;
-    robot.checkT=0;
-    addLog(rid,'召唤机器人前往','s');
-}
+        function renderAlarms() {
+            const container = document.getElementById('alarmList');
+            container.innerHTML = state.alarms.map(alarm => `
+                <div class="alarm-item level-${alarm.level}">
+                    <div class="alarm-header">
+                        <span class="alarm-bed">床位 ${String(alarm.bed).padStart(3, '0')}</span>
+                        <span class="alarm-time">${alarm.time}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span class="alarm-status" style="background: ${statusConfig[alarm.level].color}22; color: ${statusConfig[alarm.level].color};">
+                            ${alarm.message}
+                        </span>
+                        <span style="font-size: 12px; color: var(--text-secondary);">状态码: ${alarm.statusCode}</span>
+                    </div>
+                </div>
+            `).join('');
+        }
 
-function addLog(rid,msg,lvl) {
-    var t=p2(clockH)+':'+p2(clockM)+':'+p2(Math.floor(clockS));
-    logs.unshift({t:t,rid:rid,msg:msg,lvl:lvl});
-    if(logs.length>50) logs.pop();
-    var h='';
-    for(var i=0;i<logs.length;i++){
-        var l=logs[i];
-        h+='<div class="le"><span class="t">'+l.t+'</span><span class="r">'+l.rid+'号</span><span class="m '+l.lvl+'">'+l.msg+'</span></div>';
-    }
-    document.getElementById('aLog').innerHTML=h;
-}
+        // ========== MQTT数据展示 ==========
+        function updateJsonDisplay() {
+            const container = document.getElementById('jsonDisplay');
+            const data = {
+                timestamp: new Date().toISOString(),
+                device_id: "AI-CARE-001",
+                bed_id: state.currentBed,
+                status_code: getStatusCode(state.currentStatus),
+                status_text: statusConfig[state.currentStatus].level,
+                skeleton_data: {
+                    key_points: 17,
+                    pose: state.skeletonPose,
+                    confidence: (0.85 + Math.random() * 0.15).toFixed(2)
+                },
+                location: {
+                    x: (Math.random() * 10).toFixed(2),
+                    y: (Math.random() * 10).toFixed(2),
+                    theta: (Math.random() * Math.PI).toFixed(4)
+                },
+                battery: 87,
+                patrol_progress: state.patrolProgress
+            };
 
-function sendMQTT(p) {
-    var pl={bed:p.rid,danger:p.danger,box_w:Math.round(p.bbox.w),box_h:Math.round(p.bbox.h),ts:Math.floor(simTime)};
-    document.getElementById('mBox').textContent=JSON.stringify(pl,null,2);
-}
+            container.innerHTML = syntaxHighlight(JSON.stringify(data, null, 2));
+        }
 
-function toggleSim() {
-    simOn=!simOn;
-    var b=document.getElementById('btnPlay');
-    b.textContent=simOn?'⏸ 暂停':'▶ 运行';
-    if(simOn) b.classList.add('on'); else b.classList.remove('on');
-}
-function setSpd(s) { speedMul=s; document.getElementById('spdT').textContent=s+'x'; }
-function resetSim() {
-    simTime=0;clockH=22;clockM=0;clockS=0;
-    stats={patrols:0,warns:0,alarms:0,runtime:0};logs=[];
-    document.getElementById('aLog').innerHTML='';
-    robot=makeRobot();
-    for(var i=0;i<20;i++) patients[i]=makePatient(i+1);
-}
-function trigEvt() {
-    var idx=Math.floor(Math.random()*20), p=patients[idx];
-    if(p.state===P_SLEEP){p.state=P_SIT;p.st=0;addLog(idx+1,'手动:坐起','w');}
-    else if(p.state===P_SIT||p.state===P_WAKE){p.state=P_LEGS;p.st=0;addLog(idx+1,'手动:离床','w');}
-    else if(p.state>=P_LEGS){p.state=P_FALLING;p.st=0;p.fallV=0;addLog(idx+1,'手动:坠床','d');}
-}
+        function syntaxHighlight(json) {
+            json = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function (match) {
+                let cls = 'json-number';
+                if (/^"/.test(match)) {
+                    if (/:$/.test(match)) {
+                        cls = 'json-key';
+                    } else {
+                        cls = 'json-string';
+                    }
+                } else if (/true|false/.test(match)) {
+                    cls = 'json-boolean';
+                }
+                return '<span class="' + cls + '">' + match + '</span>';
+            });
+        }
 
-function p2(n){return String(Math.floor(n)).padStart(2,'0');}
-function fmtT(s){return p2(s/60)+':'+p2(s%60);}
-</script>
+        // ========== MQTT日志 ==========
+        function addMqttLog(topic, payload) {
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString('zh-CN', { hour12: false });
+
+            const logEntry = `<span class="timestamp">[${timeStr}]</span> <span class="topic">${topic}</span> <span class="payload">${payload}</span>`;
+
+            state.mqttMessages.unshift(logEntry);
+            if (state.mqttMessages.length > 50) state.mqttMessages.pop();
+
+            const container = document.getElementById('mqttLog');
+            container.innerHTML = state.mqttMessages.join('<br>');
+        }
+
+        // ========== 火柴人Canvas绘制 ==========
+        const canvas = document.getElementById('skeletonCanvas');
+        const ctx = canvas.getContext('2d');
+
+        function resizeCanvas() {
+            const container = canvas.parentElement;
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // 骨骼连接定义
+        const skeletonConnections = [
+            [0, 1], [0, 2],     // 头 -> 鼻, 头 -> 左眼 (简化)
+            [1, 3], [1, 4],     // 鼻 -> 左耳, 鼻 -> 右耳
+            [3, 5], [4, 6],     // 左耳 -> 左肩, 右耳 -> 右肩
+            [5, 7], [7, 9],     // 左肩 -> 左肘 -> 左腕
+            [6, 8], [8, 10],    // 右肩 -> 右肘 -> 右腕
+            [5, 11], [6, 12],   // 肩 -> 髋
+            [11, 12],           // 左髋 -> 右髋
+            [11, 13], [13, 15], // 左髋 -> 左膝 -> 左踝
+            [12, 14], [14, 16]  // 右髋 -> 右膝 -> 右踝
+        ];
+
+        // 不同姿态的关键点
+        const poses = {
+            lying: [
+                { x: 0.5, y: 0.2 },   // 0: 头
+                { x: 0.5, y: 0.25 },  // 1: 鼻
+                { x: 0.45, y: 0.22 }, // 2: 左眼
+                { x: 0.55, y: 0.22 }, // 3: 右眼
+                { x: 0.42, y: 0.2 },  // 4: 左耳
+                { x: 0.58, y: 0.2 },  // 5: 右耳
+                { x: 0.35, y: 0.3 },  // 6: 左肩
+                { x: 0.65, y: 0.3 },  // 7: 右肩
+                { x: 0.25, y: 0.35 }, // 8: 左肘
+                { x: 0.75, y: 0.35 }, // 9: 右肘
+                { x: 0.15, y: 0.4 },  // 10: 左腕
+                { x: 0.85, y: 0.4 },  // 11: 右腕
+                { x: 0.4, y: 0.5 },   // 12: 左髋
+                { x: 0.6, y: 0.5 },   // 13: 右髋
+                { x: 0.35, y: 0.65 }, // 14: 左膝
+                { x: 0.65, y: 0.65 }, // 15: 右膝
+                { x: 0.3, y: 0.8 },   // 16: 左踝
+                { x: 0.7, y: 0.8 }    // 17: 右踝
+            ],
+            sitting: [
+                { x: 0.5, y: 0.15 },  // 0: 头
+                { x: 0.5, y: 0.2 },   // 1: 鼻
+                { x: 0.45, y: 0.17 }, // 2: 左眼
+                { x: 0.55, y: 0.17 }, // 3: 右眼
+                { x: 0.42, y: 0.15 }, // 4: 左耳
+                { x: 0.58, y: 0.15 }, // 5: 右耳
+                { x: 0.35, y: 0.3 },  // 6: 左肩
+                { x: 0.65, y: 0.3 },  // 7: 右肩
+                { x: 0.25, y: 0.4 },  // 8: 左肘
+                { x: 0.75, y: 0.4 },  // 9: 右肘
+                { x: 0.2, y: 0.5 },   // 10: 左腕
+                { x: 0.8, y: 0.5 },   // 11: 右腕
+                { x: 0.4, y: 0.5 },   // 12: 左髋
+                { x: 0.6, y: 0.5 },   // 13: 右髋
+                { x: 0.35, y: 0.7 },  // 14: 左膝
+                { x: 0.65, y: 0.7 },  // 15: 右膝
+                { x: 0.3, y: 0.85 },  // 16: 左踝
+                { x: 0.7, y: 0.85 }   // 17: 右踝
+            ],
+            leaving: [
+                { x: 0.5, y: 0.1 },   // 0: 头
+                { x: 0.5, y: 0.15 },  // 1: 鼻
+                { x: 0.45, y: 0.12 }, // 2: 左眼
+                { x: 0.55, y: 0.12 }, // 3: 右眼
+                { x: 0.42, y: 0.1 },  // 4: 左耳
+                { x: 0.58, y: 0.1 },  // 5: 右耳
+                { x: 0.35, y: 0.25 }, // 6: 左肩
+                { x: 0.65, y: 0.25 }, // 7: 右肩
+                { x: 0.25, y: 0.35 }, // 8: 左肘
+                { x: 0.75, y: 0.35 }, // 9: 右肘
+                { x: 0.2, y: 0.45 },  // 10: 左腕
+                { x: 0.8, y: 0.45 },  // 11: 右腕
+                { x: 0.4, y: 0.45 },  // 12: 左髋
+                { x: 0.6, y: 0.45 },  // 13: 右髋
+                { x: 0.38, y: 0.65 }, // 14: 左膝
+                { x: 0.62, y: 0.65 }, // 15: 右膝
+                { x: 0.35, y: 0.85 }, // 16: 左踝
+                { x: 0.65, y: 0.85 }  // 17: 右踝
+            ],
+            falling: [
+                { x: 0.6, y: 0.3 },   // 0: 头
+                { x: 0.55, y: 0.35 }, // 1: 鼻
+                { x: 0.58, y: 0.28 }, // 2: 左眼
+                { x: 0.62, y: 0.28 }, // 3: 右眼
+                { x: 0.55, y: 0.25 }, // 4: 左耳
+                { x: 0.65, y: 0.25 }, // 5: 右耳
+                { x: 0.4, y: 0.45 },  // 6: 左肩
+                { x: 0.7, y: 0.45 },  // 7: 右肩
+                { x: 0.3, y: 0.55 },  // 8: 左肘
+                { x: 0.8, y: 0.5 },   // 9: 右肘
+                { x: 0.2, y: 0.65 },  // 10: 左腕
+                { x: 0.85, y: 0.6 },  // 11: 右腕
+                { x: 0.45, y: 0.65 }, // 12: 左髋
+                { x: 0.65, y: 0.65 }, // 13: 右髋
+                { x: 0.35, y: 0.75 }, // 14: 左膝
+                { x: 0.7, y: 0.75 },  // 15: 右膝
+                { x: 0.25, y: 0.85 }, // 16: 左踝
+                { x: 0.75, y: 0.85 }  // 17: 右踝
+            ]
+        };
+
+        let currentPosePoints = [...poses.lying];
+        let targetPosePoints = [...poses.lying];
+        let animProgress = 1;
+
+        function drawSkeleton() {
+            const w = canvas.width;
+            const h = canvas.height;
+
+            ctx.clearRect(0, 0, w, h);
+
+            // 绘制背景网格
+            ctx.strokeStyle = 'rgba(0, 102, 204, 0.1)';
+            ctx.lineWidth = 1;
+            for (let i = 0; i < w; i += 30) {
+                ctx.beginPath();
+                ctx.moveTo(i, 0);
+                ctx.lineTo(i, h);
+                ctx.stroke();
+            }
+            for (let i = 0; i < h; i += 30) {
+                ctx.beginPath();
+                ctx.moveTo(0, i);
+                ctx.lineTo(w, i);
+                ctx.stroke();
+            }
+
+            // 插值动画
+            if (animProgress < 1) {
+                animProgress += 0.05;
+                if (animProgress > 1) animProgress = 1;
+
+                for (let i = 0; i < currentPosePoints.length; i++) {
+                    currentPosePoints[i].x += (targetPosePoints[i].x - currentPosePoints[i].x) * 0.1;
+                    currentPosePoints[i].y += (targetPosePoints[i].y - currentPosePoints[i].y) * 0.1;
+                }
+            }
+
+            // 绘制连线
+            ctx.strokeStyle = '#0066CC';
+            ctx.lineWidth = 3;
+            ctx.lineCap = 'round';
+
+            skeletonConnections.forEach(([a, b]) => {
+                if (a < currentPosePoints.length && b < currentPosePoints.length) {
+                    ctx.beginPath();
+                    ctx.moveTo(currentPosePoints[a].x * w, currentPosePoints[a].y * h);
+                    ctx.lineTo(currentPosePoints[b].x * w, currentPosePoints[b].y * h);
+                    ctx.stroke();
+                }
+            });
+
+            // 绘制关键点
+            currentPosePoints.forEach((point, index) => {
+                const x = point.x * w;
+                const y = point.y * h;
+                const radius = index === 0 ? 12 : 6;
+
+                // 发光效果
+                const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius * 2);
+                gradient.addColorStop(0, 'rgba(0, 204, 102, 0.8)');
+                gradient.addColorStop(1, 'rgba(0, 204, 102, 0)');
+                ctx.fillStyle = gradient;
+                ctx.beginPath();
+                ctx.arc(x, y, radius * 2, 0, Math.PI * 2);
+                ctx.fill();
+
+                // 实心点
+                ctx.fillStyle = index === 0 ? '#00cc66' : '#00aaff';
+                ctx.beginPath();
+                ctx.arc(x, y, radius, 0, Math.PI * 2);
+                ctx.fill();
+
+                // 边框
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            });
+        }
+
+        function changePose(poseName) {
+            if (poses[poseName]) {
+                targetPosePoints = poses[poseName].map(p => ({ ...p }));
+                animProgress = 0;
+            }
+        }
+
+        // 动画循环
+        function animate() {
+            drawSkeleton();
+            requestAnimationFrame(animate);
+        }
+
+        animate();
+
+        // ========== 模拟数据更新 ==========
+        let dataUpdateTimer = null;
+        let countdownValue = 3;
+
+        function startDataSimulation() {
+            // 清除旧的定时器
+            if (dataUpdateTimer) clearInterval(dataUpdateTimer);
+
+            countdownValue = 3;
+            updateCountdown();
+
+            dataUpdateTimer = setInterval(() => {
+                countdownValue--;
+
+                if (countdownValue <= 0) {
+                    // 随机切换状态
+                    const statuses = ['safe', 'safe', 'safe', 'sit', 'sit', 'prepare', 'fall'];
+                    const randomStatus = statuses[Math.floor(Math.random() * statuses.length)];
+
+                    updateStatus(randomStatus);
+
+                    // 更新巡检进度
+                    if (state.isPatrolling) {
+                        state.patrolProgress = Math.min(100, state.patrolProgress + Math.random() * 15);
+                        document.getElementById('progressFill').style.width = state.patrolProgress + '%';
+                        document.getElementById('progressText').textContent = Math.round(state.patrolProgress) + '%';
+
+                        if (state.patrolProgress >= 100) {
+                            state.patrolProgress = 0;
+                            addAlarm('safe', '巡检完成，开始新一轮');
+                        }
+                    }
+
+                    // 添加MQTT日志
+                    addMqttLog('sensor/data', JSON.stringify({
+                        bed_id: state.currentBed,
+                        status: state.currentStatus,
+                        pose: state.skeletonPose
+                    }));
+
+                    countdownValue = 2 + Math.floor(Math.random() * 2); // 2-3秒
+                }
+
+                updateCountdown();
+            }, 1000);
+        }
+
+        function updateCountdown() {
+            document.getElementById('countdownTimer').textContent =
+                '00:0' + countdownValue;
+        }
+
+        // ========== 初始化 ==========
+        function init() {
+            // 初始化报警记录
+            addAlarm('safe', '系统启动完成');
+            addAlarm('safe', 'K230视觉模块已连接');
+            addAlarm('safe', 'MQTT通信建立成功');
+
+            // 初始化MQTT日志
+            addMqttLog('system/init', JSON.stringify({ status: 'ok', version: '1.0.0' }));
+            addMqttLog('k230/connect', JSON.stringify({ ip: '192.168.1.100', port: 8080 }));
+            addMqttLog('mqtt/connect', JSON.stringify({ broker: '192.168.1.1', port: 1883 }));
+
+            // 初始化JSON显示
+            updateJsonDisplay();
+
+            // 启动数据模拟
+            startDataSimulation();
+
+            // 监听输入框回车
+            document.getElementById('bedInput').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') confirmBed();
+            });
+        }
+
+        // 页面加载后初始化
+        window.addEventListener('load', init);
+    </script>
 </body>
 </html>
