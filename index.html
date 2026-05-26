@@ -24,8 +24,8 @@ body{font-family:'Microsoft YaHei',sans-serif;background:#080c18;color:#d0dce8;h
 .map-bar button:hover{border-color:#0088ff;background:#1a2a40}
 .map-bar button.on{background:#003366;border-color:#0088ff;color:#00aaff}
 .map-bar .lbl{font-size:10px;color:#5580aa}
-.map-box{flex:1;background:#040810;border:1px solid #1e3050;border-radius:4px;overflow:hidden;position:relative}
-#cv{display:block;position:absolute;top:0;left:0;width:100%;height:100%}
+.map-box{flex:1;background:#040810;border:1px solid #1e3050;border-radius:4px;position:relative;overflow:hidden}
+#cv{display:block;width:100%;height:100%}
 .pnl{width:380px;background:#0e1525;border-left:1px solid #1e3050;display:flex;flex-direction:column;overflow-y:auto;flex-shrink:0}
 .pnl::-webkit-scrollbar{width:4px}.pnl::-webkit-scrollbar-thumb{background:#1e3050}
 .sec{border-bottom:1px solid #1e3050;padding:8px 10px}
@@ -115,66 +115,49 @@ body{font-family:'Microsoft YaHei',sans-serif;background:#080c18;color:#d0dce8;h
 </div>
 
 <script>
-// ============ 配置常量 ============
-const ROOM_W = 110, ROOM_H = 90, GAP = 6;
-const CORRIDOR_H = 70;
-const ROOMS_PER_ROW = 10;
-const PATROL_SPEED = 1.5;
-const FAST_SPEED = 4.0;
-const ROBOT_RADIUS = 14;
-
-// 危险等级
-const D_SAFE=0, D_SIT=1, D_LEAVE=2, D_FALL=3;
-const D_TXT = ['安全','起坐','离床预警','坠床警报'];
-const D_CLR = ['#00cc66','#ffaa00','#ff8800','#ff3344'];
-
-// 病人状态
-const P_SLEEP=0, P_WAKE=1, P_SIT=2, P_LEGS=3, P_STAND=4, P_FALLING=5, P_FALLEN=6;
-const P_TXT = ['熟睡','翻身','坐起','离床准备','站立','跌倒中','已跌倒'];
+// ============ 配置 ============
+var ROOM_W = 110, ROOM_H = 90, GAP = 6, CORRIDOR_H = 70;
+var PATROL_SPEED = 1.2, FAST_SPEED = 3.5;
+var D_SAFE=0,D_SIT=1,D_LEAVE=2,D_FALL=3;
+var D_TXT=['安全','起坐','离床预警','坠床警报'];
+var D_CLR=['#00cc66','#ffaa00','#ff8800','#ff3344'];
+var P_SLEEP=0,P_WAKE=1,P_SIT=2,P_LEGS=3,P_STAND=4,P_FALLING=5,P_FALLEN=6;
+var P_TXT=['熟睡','翻身','坐起','离床准备','站立','跌倒中','已跌倒'];
 
 // ============ 全局状态 ============
-let canvas, ctx, camCanvas, camCtx;
-let canvasW, canvasH;
-let rooms = [];
-let robot;
-let patients = [];
-let simOn = true;
-let simTime = 0;
-let clockH = 22, clockM = 0, clockS = 0;
-let selectedRoom = -1;
-let logs = [];
-let stats = { patrols:0, warns:0, alarms:0, runtime:0 };
-let fpsCounter = 0, fpsTimer = 0, currentFps = 60;
-let lastTimestamp = 0;
-let speedMultiplier = 1;
-let mapTransform = { ox:0, oy:0, scale:1 };
+var canvas, ctx, camCanvas, camCtx;
+var canvasW, canvasH;
+var rooms = [], robot, patients = [];
+var simOn = true, simTime = 0;
+var clockH=22, clockM=0, clockS=0;
+var selectedRoom = -1;
+var logs = [];
+var stats = {patrols:0,warns:0,alarms:0,runtime:0};
+var fpsCnt=0, fpsTm=0, currentFps=60, lastTs=0;
+var speedMul = 1;
+var mapT = {ox:0,oy:0,s:1};
 
 // ============ 初始化 ============
-window.addEventListener('load', function() {
+window.onload = function() {
     canvas = document.getElementById('cv');
     ctx = canvas.getContext('2d');
     camCanvas = document.getElementById('camCv');
     camCtx = camCanvas.getContext('2d');
-
-    resizeCanvas();
-    window.addEventListener('resize', resizeCanvas);
-
+    doResize();
+    window.onresize = doResize;
     buildRooms();
-    robot = createRobot();
-    for (let i = 0; i < 20; i++) patients.push(createPatient(i + 1));
-
-    // 预设一些不同状态的病人
-    patients[2].state = P_SIT; patients[2].stateTimer = 0.5;
-    patients[7].state = P_LEGS; patients[7].stateTimer = 0.3;
-    patients[14].state = P_WAKE; patients[14].stateTimer = 0.8;
-
+    robot = makeRobot();
+    for (var i=0;i<20;i++) patients.push(makePatient(i+1));
+    patients[2].state=P_SIT; patients[2].st=0.5;
+    patients[7].state=P_LEGS; patients[7].st=0.3;
+    patients[14].state=P_WAKE; patients[14].st=0.8;
     buildGrid();
-    canvas.addEventListener('click', onCanvasClick);
-    requestAnimationFrame(gameLoop);
-});
+    canvas.onclick = onMapClick;
+    requestAnimationFrame(loop);
+};
 
-function resizeCanvas() {
-    const box = canvas.parentElement;
+function doResize() {
+    var box = canvas.parentElement;
     canvas.width = box.clientWidth;
     canvas.height = box.clientHeight;
     canvasW = canvas.width;
@@ -184,824 +167,546 @@ function resizeCanvas() {
 // ============ 病房布局 ============
 function buildRooms() {
     rooms = [];
-    const startX = 35, startY = 30;
-    // 上排 1-10
-    for (let i = 0; i < 10; i++) {
-        const x = startX + i * (ROOM_W + GAP);
-        rooms.push({
-            id: i + 1,
-            x: x, y: startY, w: ROOM_W, h: ROOM_H,
-            doorX: x + ROOM_W / 2,
-            doorY: startY + ROOM_H,
-            bedX: x + 15, bedY: startY + 20, bedW: 75, bedH: 40,
-            row: 0
-        });
+    var sx=35, sy=30;
+    for (var i=0;i<10;i++) {
+        var x = sx + i*(ROOM_W+GAP);
+        rooms.push({id:i+1, x:x, y:sy, w:ROOM_W, h:ROOM_H,
+            doorX:x+ROOM_W/2, doorY:sy+ROOM_H,
+            bedX:x+15, bedY:sy+20, bedW:75, bedH:40, row:0});
     }
-    // 下排 11-20
-    const bottomY = startY + ROOM_H + CORRIDOR_H + 8;
-    for (let i = 0; i < 10; i++) {
-        const x = startX + i * (ROOM_W + GAP);
-        rooms.push({
-            id: i + 11,
-            x: x, y: bottomY, w: ROOM_W, h: ROOM_H,
-            doorX: x + ROOM_W / 2,
-            doorY: bottomY,
-            bedX: x + 15, bedY: bottomY + 20, bedW: 75, bedH: 40,
-            row: 1
-        });
+    var by = sy + ROOM_H + CORRIDOR_H + 8;
+    for (var i=0;i<10;i++) {
+        var x = sx + i*(ROOM_W+GAP);
+        rooms.push({id:i+11, x:x, y:by, w:ROOM_W, h:ROOM_H,
+            doorX:x+ROOM_W/2, doorY:by,
+            bedX:x+15, bedY:by+20, bedW:75, bedH:40, row:1});
     }
 }
 
-function getCorridorY() {
-    return 30 + ROOM_H + CORRIDOR_H / 2 + 4;
-}
+function corridorY() { return 30 + ROOM_H + CORRIDOR_H/2 + 4; }
 
-function getRoomDoorPos(roomId) {
-    const r = rooms[roomId - 1];
-    const cy = getCorridorY();
-    return r.row === 0
-        ? { x: r.doorX, y: cy - 12 }
-        : { x: r.doorX, y: cy + 12 };
+function doorPos(rid) {
+    var r = rooms[rid-1];
+    var cy = corridorY();
+    return r.row===0 ? {x:r.doorX, y:cy-12} : {x:r.doorX, y:cy+12};
 }
 
 // ============ 机器人 ============
-function createRobot() {
+function makeRobot() {
     return {
-        x: 55,
-        y: getCorridorY(),
-        heading: 0,
-        speed: 0,
-        targetSpeed: PATROL_SPEED,
-        pidL: { err: 0, prevErr: 0, prevPrevErr: 0, output: 0 },
-        pidR: { err: 0, prevErr: 0, prevPrevErr: 0, output: 0 },
-        filtAng: 0,
-        imuOmega: 0,
-        ultrasonic: 400,
-        patrolIdx: 1,
-        patrolDir: 1,
-        isRunning: true,
-        currentRoom: 0,
-        checkTimer: 0,
-        CHECK_DURATION: 2.5,
-        navTarget: null,
-        isNavigating: false,
-        results: Array.from({ length: 20 }, () => ({ danger: 0, lastTime: 0, bw: 0, bh: 0 })),
-        battery: 85
+        x:55, y:corridorY(), heading:0, speed:0,
+        pidL:0, pidR:0, filtAng:0, ultra:400,
+        targetRoom:1, dir:1,
+        isRunning:true, curRoom:0, checkT:0, CHECK_DUR:2.5,
+        navTarget:null, isNav:false,
+        results: (function(){var a=[];for(var i=0;i<20;i++)a.push({danger:0,lt:0});return a;})(),
+        battery:85
     };
 }
 
 // ============ 病人 ============
-function createPatient(roomId) {
-    return {
-        roomId: roomId,
-        state: P_SLEEP,
-        danger: D_SAFE,
-        stateTimer: 0,
-        threshold: 5 + Math.random() * 15,
-        angle: 0,
-        hipHeight: 70,
-        fallVelocity: 0,
-        keypoints: [],
-        bbox: { x: 0, y: 0, w: 0, h: 0 },
-        eventTimer: 0,
-        nextEvent: 5 + Math.random() * 30
-    };
+function makePatient(rid) {
+    return {rid:rid, state:P_SLEEP, danger:D_SAFE, st:0,
+        thresh:5+Math.random()*15, angle:0, hipH:70, fallV:0,
+        kps:[], bbox:{x:0,y:0,w:0,h:0},
+        evtT:0, nextEvt:5+Math.random()*30};
 }
 
-// ============ PID控制器 ============
-function pidCalculate(pid, target, actual) {
-    const KP = 2.0, KI = 0.05, KD = 0.8;
-    const err = target - actual;
-    const integral = Math.abs(err) < 1.0 ? KI * err : 0;
-    const delta = KP * (err - pid.prevErr) + integral + KD * (err - 2 * pid.prevErr + pid.prevPrevErr);
-    pid.prevPrevErr = pid.prevErr;
-    pid.prevErr = err;
-    pid.output += delta;
-    // 死区补偿
-    if (pid.output > 0 && pid.output < 0.05) pid.output = 0.05;
-    if (pid.output < 0 && pid.output > -0.05) pid.output = -0.05;
-    pid.output = Math.max(-1, Math.min(1, pid.output));
-    return pid.output;
-}
-
-// ============ 互补滤波 ============
-function complementaryFilter(robot, gyroOmega, odoAngle, dt) {
-    robot.filtAng = 0.98 * (robot.filtAng + gyroOmega * dt) + 0.02 * odoAngle;
-    return robot.filtAng;
+// ============ PID ============
+function pidCalc(prev, target, actual) {
+    var KP=2.0, KI=0.05, KD=0.8;
+    var err = target - actual;
+    var integ = Math.abs(err)<1.0 ? KI*err : 0;
+    var du = KP*(err-prev.pe) + integ + KD*(err-2*prev.pe+prev.ppe);
+    prev.ppe = prev.pe; prev.pe = err;
+    prev.out += du;
+    if(prev.out>0&&prev.out<0.05) prev.out=0.05;
+    if(prev.out<0&&prev.out>-0.05) prev.out=-0.05;
+    if(prev.out>1) prev.out=1;
+    if(prev.out<-1) prev.out=-1;
+    return prev.out;
 }
 
 // ============ 更新机器人 ============
 function updateRobot(dt) {
-    if (!robot.isRunning && !robot.isNavigating) return;
+    if(!robot.isRunning && !robot.isNav) return;
 
-    const currentSpeed = robot.isNavigating ? FAST_SPEED * speedMultiplier : PATROL_SPEED * speedMultiplier;
-    robot.targetSpeed = currentSpeed;
+    var spd = robot.isNav ? FAST_SPEED*speedMul : PATROL_SPEED*speedMul;
+    var tx, ty;
 
-    let targetX, targetY;
-
-    if (robot.isNavigating && robot.navTarget) {
-        targetX = robot.navTarget.x;
-        targetY = robot.navTarget.y;
-    } else if (robot.currentRoom > 0) {
-        // 正在检查病房
-        robot.checkTimer += dt;
-        const p = patients[robot.currentRoom - 1];
-        robot.results[robot.currentRoom - 1] = { danger: p.danger, lastTime: simTime, bw: p.bbox.w, bh: p.bbox.h };
-        // 检查对面病房
-        const r = rooms[robot.currentRoom - 1];
-        const oppId = r.row === 0 ? robot.currentRoom + 10 : robot.currentRoom - 10;
-        const opp = patients[oppId - 1];
-        robot.results[oppId - 1] = { danger: opp.danger, lastTime: simTime, bw: opp.bbox.w, bh: opp.bbox.h };
-
-        if (robot.checkTimer >= robot.CHECK_DURATION) {
-            robot.checkTimer = 0;
-            robot.currentRoom = 0;
-            if (robot.patrolDir === 1) {
-                robot.patrolIdx++;
-                if (robot.patrolIdx > 20) { robot.patrolIdx = 19; robot.patrolDir = -1; stats.patrols++; }
+    if(robot.isNav && robot.navTarget) {
+        tx = robot.navTarget.x;
+        ty = robot.navTarget.y;
+    } else if(robot.curRoom > 0) {
+        // 检查病房中
+        robot.checkT += dt;
+        var p = patients[robot.curRoom-1];
+        robot.results[robot.curRoom-1] = {danger:p.danger, lt:simTime};
+        var rm = rooms[robot.curRoom-1];
+        var oppId = rm.row===0 ? robot.curRoom+10 : robot.curRoom-10;
+        var opp = patients[oppId-1];
+        robot.results[oppId-1] = {danger:opp.danger, lt:simTime};
+        if(robot.checkT >= robot.CHECK_DUR) {
+            robot.checkT = 0;
+            robot.curRoom = 0;
+            if(robot.dir===1) {
+                robot.targetRoom++;
+                if(robot.targetRoom>20){robot.targetRoom=19;robot.dir=-1;stats.patrols++;}
             } else {
-                robot.patrolIdx--;
-                if (robot.patrolIdx < 1) { robot.patrolIdx = 2; robot.patrolDir = 1; stats.patrols++; }
+                robot.targetRoom--;
+                if(robot.targetRoom<1){robot.targetRoom=2;robot.dir=1;stats.patrols++;}
             }
         }
+        robot.speed = 0;
         return;
     } else {
-        const wp = getRoomDoorPos(robot.patrolIdx);
-        targetX = wp.x;
-        targetY = wp.y;
+        var wp = doorPos(robot.targetRoom);
+        tx = wp.x; ty = wp.y;
     }
 
-    const dx = targetX - robot.x;
-    const dy = targetY - robot.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
+    var dx = tx - robot.x;
+    var dy = ty - robot.y;
+    var dist = Math.sqrt(dx*dx + dy*dy);
 
-    // 到达目标
-    if (dist < 6) {
-        if (robot.isNavigating) {
-            robot.isNavigating = false;
+    // 到达
+    if(dist < 8) {
+        if(robot.isNav) {
+            robot.isNav = false;
             robot.navTarget = null;
-            robot.currentRoom = robot.patrolIdx;
-            robot.checkTimer = 0;
-        } else {
-            robot.currentRoom = robot.patrolIdx;
-            robot.checkTimer = 0;
-            stats.patrols++;
         }
+        robot.curRoom = robot.targetRoom;
+        robot.checkT = 0;
         robot.speed = 0;
         return;
     }
 
-    // 航向角计算
-    const targetHeading = Math.atan2(dy, dx);
-    let headingError = targetHeading - robot.heading;
-    while (headingError > Math.PI) headingError -= 2 * Math.PI;
-    while (headingError < -Math.PI) headingError += 2 * Math.PI;
+    // 直接移动（简化PID为平滑插值）
+    var moveSpd = spd;
+    if(dist < 30) moveSpd = spd * (dist/30) * 0.5 + spd*0.3; // 减速接近
 
-    // IMU模拟
-    robot.imuOmega = headingError * 3.0 + (Math.random() - 0.5) * 0.02;
-    const odoAngle = robot.heading + (Math.random() - 0.5) * 0.005;
-    robot.heading = complementaryFilter(robot, robot.imuOmega, odoAngle, dt);
+    var tgtH = Math.atan2(dy, dx);
+    var hErr = tgtH - robot.heading;
+    while(hErr>Math.PI) hErr-=2*Math.PI;
+    while(hErr<-Math.PI) hErr+=2*Math.PI;
 
-    // 转弯减速因子
-    const turnFactor = Math.max(0.3, 1 - Math.abs(headingError) * 0.4);
-    const adjustedSpeed = robot.targetSpeed * turnFactor;
+    // 平滑转向
+    robot.heading += hErr * 0.15;
 
-    // PID控制
-    const wheelBase = 16;
-    const turnRate = headingError * 2.0;
-    const leftTarget = adjustedSpeed + turnRate * wheelBase * 0.01;
-    const rightTarget = adjustedSpeed - turnRate * wheelBase * 0.01;
-    const leftActual = robot.speed + (Math.random() - 0.5) * 0.02;
-    const rightActual = robot.speed + (Math.random() - 0.5) * 0.02;
-    pidCalculate(robot.pidL, leftTarget, leftActual);
-    pidCalculate(robot.pidR, rightTarget, rightActual);
-    robot.speed = (robot.pidL.output + robot.pidR.output) * 0.5 * robot.targetSpeed * 2;
+    // 互补滤波模拟
+    robot.filtAng = 0.98*(robot.filtAng + hErr*3*dt) + 0.02*tgtH;
 
-    // 位置更新
+    // PID输出模拟
+    var lTgt = moveSpd + hErr*0.3;
+    var rTgt = moveSpd - hErr*0.3;
+    if(!robot._pidL) robot._pidL={pe:0,ppe:0,out:0};
+    if(!robot._pidR) robot._pidR={pe:0,ppe:0,out:0};
+    robot.pidL = pidCalc(robot._pidL, lTgt, robot.speed);
+    robot.pidR = pidCalc(robot._pidR, rTgt, robot.speed);
+
+    robot.speed = (robot.pidL + robot.pidR) * 0.5 * moveSpd;
+    if(robot.speed < 0.1) robot.speed = 0.1;
+
     robot.x += Math.cos(robot.heading) * robot.speed;
     robot.y += Math.sin(robot.heading) * robot.speed;
 
-    // 超声波模拟
-    robot.ultrasonic = dist * 1.5 + 20;
-    robot.battery = Math.max(0, robot.battery - dt * 0.001);
+    robot.ultra = dist*1.5 + 20;
+    robot.battery = Math.max(0, robot.battery - dt*0.001);
 }
 
 // ============ 病人FSM ============
 function updatePatient(p, dt) {
-    p.stateTimer += dt;
-    p.eventTimer += dt;
-
-    // 随机事件触发
-    if (p.eventTimer >= p.nextEvent) {
-        p.eventTimer = 0;
-        p.nextEvent = 8 + Math.random() * 40;
-        if (p.state === P_SLEEP && Math.random() < 0.3) {
-            p.state = P_WAKE; p.stateTimer = 0; p.threshold = 0.5 + Math.random();
-        }
+    p.st += dt;
+    p.evtT += dt;
+    if(p.evtT >= p.nextEvt) {
+        p.evtT = 0;
+        p.nextEvt = 8+Math.random()*40;
+        if(p.state===P_SLEEP && Math.random()<0.3) {p.state=P_WAKE;p.st=0;p.thresh=0.5+Math.random();}
     }
-
-    switch (p.state) {
+    switch(p.state) {
         case P_SLEEP:
-            p.angle = Math.random() * 5;
-            p.hipHeight = 70 + Math.random() * 3;
-            p.fallVelocity = 0;
-            p.danger = D_SAFE;
-            break;
+            p.angle=Math.random()*5; p.hipH=70+Math.random()*3; p.fallV=0; p.danger=D_SAFE; break;
         case P_WAKE:
-            p.angle = 10 + Math.random() * 15;
-            p.hipHeight = 68 + Math.random() * 4;
-            p.danger = D_SAFE;
-            if (p.stateTimer >= p.threshold) { p.state = P_SIT; p.stateTimer = 0; p.threshold = 1 + Math.random(); }
-            break;
+            p.angle=10+Math.random()*15; p.hipH=68+Math.random()*4; p.danger=D_SAFE;
+            if(p.st>=p.thresh){p.state=P_SIT;p.st=0;p.thresh=1+Math.random();} break;
         case P_SIT:
-            p.angle = 45 + Math.random() * 20;
-            p.hipHeight = 55 + Math.random() * 5;
-            if (p.stateTimer >= 1.0) p.danger = D_SIT;
-            if (p.stateTimer >= p.threshold) {
-                if (Math.random() < 0.5) { p.state = P_LEGS; p.stateTimer = 0; p.threshold = 0.5 + Math.random() * 1.5; }
-                else { p.state = P_SLEEP; p.stateTimer = 0; p.danger = D_SAFE; }
-            }
-            break;
+            p.angle=45+Math.random()*20; p.hipH=55+Math.random()*5;
+            if(p.st>=1.0) p.danger=D_SIT;
+            if(p.st>=p.thresh){
+                if(Math.random()<0.5){p.state=P_LEGS;p.st=0;p.thresh=0.5+Math.random()*1.5;}
+                else{p.state=P_SLEEP;p.st=0;p.danger=D_SAFE;}
+            } break;
         case P_LEGS:
-            p.angle = 60 + Math.random() * 25;
-            p.hipHeight = 45 + Math.random() * 5;
-            p.danger = D_LEAVE;
-            if (p.stateTimer >= p.threshold) {
-                if (Math.random() < 0.35) { p.state = P_STAND; p.stateTimer = 0; p.threshold = 1 + Math.random(); }
-                else { p.state = P_STAND; p.stateTimer = 0; p.threshold = 3 + Math.random() * 5; }
-            }
-            break;
+            p.angle=60+Math.random()*25; p.hipH=45+Math.random()*5; p.danger=D_LEAVE;
+            if(p.st>=p.thresh){
+                if(Math.random()<0.35){p.state=P_STAND;p.st=0;p.thresh=1+Math.random();}
+                else{p.state=P_STAND;p.st=0;p.thresh=3+Math.random()*5;}
+            } break;
         case P_STAND:
-            p.angle = 75 + Math.random() * 15;
-            if (p.stateTimer > 1.5 && Math.random() < 0.02) { p.state = P_FALLING; p.stateTimer = 0; p.fallVelocity = 0; }
-            if (p.stateTimer >= p.threshold && p.state !== P_FALLING) { p.state = P_SLEEP; p.stateTimer = 0; p.danger = D_SAFE; }
-            break;
+            p.angle=75+Math.random()*15;
+            if(p.st>1.5&&Math.random()<0.02){p.state=P_FALLING;p.st=0;p.fallV=0;}
+            if(p.st>=p.thresh&&p.state!==P_FALLING){p.state=P_SLEEP;p.st=0;p.danger=D_SAFE;} break;
         case P_FALLING:
-            p.fallVelocity += 9.8 * dt * 20;
-            p.hipHeight -= p.fallVelocity * dt;
-            p.danger = D_FALL;
-            if (p.hipHeight <= 20 || p.stateTimer > 0.8) {
-                p.state = P_FALLEN; p.stateTimer = 0; p.hipHeight = 20; p.fallVelocity = 0;
-                addLog(p.roomId, '坠床/跌倒！高级危态警报', 'd');
-                stats.alarms++;
-                sendMQTT(p);
-            }
-            break;
+            p.fallV+=9.8*dt*20; p.hipH-=p.fallV*dt; p.danger=D_FALL;
+            if(p.hipH<=20||p.st>0.8){
+                p.state=P_FALLEN;p.st=0;p.hipH=20;p.fallV=0;
+                addLog(p.rid,'坠床/跌倒！高级危态警报','d');stats.alarms++;sendMQTT(p);
+            } break;
         case P_FALLEN:
-            p.danger = D_FALL;
-            p.hipHeight = 20;
-            if (p.stateTimer > 10) { p.state = P_SLEEP; p.stateTimer = 0; p.danger = D_SAFE; addLog(p.roomId, '医护人员已到场', 's'); }
-            break;
+            p.danger=D_FALL;p.hipH=20;
+            if(p.st>10){p.state=P_SLEEP;p.st=0;p.danger=D_SAFE;addLog(p.rid,'医护人员已到场','s');} break;
     }
-    generateKeypoints(p);
+    genKps(p);
 }
 
-function generateKeypoints(p) {
-    const cx = 60, cy = 50;
-    const a = p.angle * Math.PI / 180;
-    const hy = cy + 15 - (70 - p.hipHeight) * 0.5;
-    const hx = cx - 15 * Math.sin(a);
-    const headY = hy - 30 * Math.cos(a);
-    const kp = [];
-    // 0-4: 头部
-    kp.push({ x: hx, y: headY, c: .95 });
-    kp.push({ x: hx - 4, y: headY - 3, c: .9 });
-    kp.push({ x: hx + 4, y: headY - 3, c: .9 });
-    kp.push({ x: hx - 7, y: headY, c: .85 });
-    kp.push({ x: hx + 7, y: headY, c: .85 });
-    // 5-6: 肩膀
-    const sy = hy - 18 * Math.cos(a), sx = cx - 8 * Math.sin(a);
-    kp.push({ x: sx - 12, y: sy, c: .92 });
-    kp.push({ x: sx + 12, y: sy, c: .92 });
-    // 7-8: 肘
-    kp.push({ x: sx - 18, y: sy + 10 * Math.cos(a), c: .88 });
-    kp.push({ x: sx + 18, y: sy + 10 * Math.cos(a), c: .88 });
-    // 9-10: 手腕
-    kp.push({ x: sx - 22, y: sy + 18 * Math.cos(a), c: .82 });
-    kp.push({ x: sx + 22, y: sy + 18 * Math.cos(a), c: .82 });
-    // 11-12: 髋
-    kp.push({ x: cx - 8, y: hy, c: .93 });
-    kp.push({ x: cx + 8, y: hy, c: .93 });
-    // 13-14: 膝
-    const ky = hy + 15 * Math.cos(a);
-    const kneeSpread = p.state >= P_LEGS ? 12 : 6;
-    kp.push({ x: cx - kneeSpread, y: ky, c: .9 });
-    kp.push({ x: cx + kneeSpread, y: ky, c: .9 });
-    // 15-16: 脚踝
-    const ay = ky + 15 * Math.cos(a);
-    const ankleSpread = p.state >= P_LEGS ? 15 : 5;
-    kp.push({ x: cx - ankleSpread, y: ay, c: .85 });
-    kp.push({ x: cx + ankleSpread, y: ay, c: .85 });
-
-    p.keypoints = kp;
-    let x1 = 999, y1 = 999, x2 = 0, y2 = 0;
-    for (const q of kp) { if (q.x < x1) x1 = q.x; if (q.y < y1) y1 = q.y; if (q.x > x2) x2 = q.x; if (q.y > y2) y2 = q.y; }
-    p.bbox = { x: x1 - 2, y: y1 - 2, w: x2 - x1 + 4, h: y2 - y1 + 4 };
+function genKps(p) {
+    var cx=60,cy=50, a=p.angle*Math.PI/180;
+    var hy=cy+15-(70-p.hipH)*0.5;
+    var hx=cx-15*Math.sin(a), headY=hy-30*Math.cos(a);
+    var kp=[];
+    kp.push({x:hx,y:headY,c:.95},{x:hx-4,y:headY-3,c:.9},{x:hx+4,y:headY-3,c:.9},{x:hx-7,y:headY,c:.85},{x:hx+7,y:headY,c:.85});
+    var sy=hy-18*Math.cos(a), sx=cx-8*Math.sin(a);
+    kp.push({x:sx-12,y:sy,c:.92},{x:sx+12,y:sy,c:.92});
+    kp.push({x:sx-18,y:sy+10*Math.cos(a),c:.88},{x:sx+18,y:sy+10*Math.cos(a),c:.88});
+    kp.push({x:sx-22,y:sy+18*Math.cos(a),c:.82},{x:sx+22,y:sy+18*Math.cos(a),c:.82});
+    kp.push({x:cx-8,y:hy,c:.93},{x:cx+8,y:hy,c:.93});
+    var ky=hy+15*Math.cos(a), ks=p.state>=P_LEGS?12:6;
+    kp.push({x:cx-ks,y:ky,c:.9},{x:cx+ks,y:ky,c:.9});
+    var ay=ky+15*Math.cos(a), as2=p.state>=P_LEGS?15:5;
+    kp.push({x:cx-as2,y:ay,c:.85},{x:cx+as2,y:ay,c:.85});
+    p.kps=kp;
+    var x1=999,y1=999,x2=0,y2=0;
+    for(var i=0;i<kp.length;i++){var q=kp[i];if(q.x<x1)x1=q.x;if(q.y<y1)y1=q.y;if(q.x>x2)x2=q.x;if(q.y>y2)y2=q.y;}
+    p.bbox={x:x1-2,y:y1-2,w:x2-x1+4,h:y2-y1+4};
 }
 
 // ============ 渲染地图 ============
 function renderMap() {
-    const W = canvasW, H = canvasH;
-    ctx.fillStyle = '#040810';
-    ctx.fillRect(0, 0, W, H);
+    var W=canvasW, H=canvasH;
+    // 清空
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle='#040810';
+    ctx.fillRect(0,0,W,H);
 
-    if (W < 100 || H < 100) return;
+    if(W<100||H<100) return;
 
-    // 计算缩放
-    const mapW = ROOMS_PER_ROW * (ROOM_W + GAP) + 80;
-    const mapH = ROOM_H * 2 + CORRIDOR_H + 80;
-    const scale = Math.min((W - 16) / mapW, (H - 16) / mapH);
-    const ox = (W - mapW * scale) / 2;
-    const oy = (H - mapH * scale) / 2;
-    mapTransform = { ox, oy, scale };
+    var mapW=10*(ROOM_W+GAP)+80;
+    var mapH=ROOM_H*2+CORRIDOR_H+80;
+    var sc=Math.min((W-16)/mapW,(H-16)/mapH);
+    var ox=(W-mapW*sc)/2, oy=(H-mapH*sc)/2;
+    mapT={ox:ox,oy:oy,s:sc};
 
     ctx.save();
-    ctx.translate(ox, oy);
-    ctx.scale(scale, scale);
+    ctx.translate(ox,oy);
+    ctx.scale(sc,sc);
 
-    const corridorY = getCorridorY();
+    var cy=corridorY();
 
-    // 走廊地面
-    ctx.fillStyle = '#0a1218';
-    ctx.fillRect(20, corridorY - CORRIDOR_H / 2, mapW - 40, CORRIDOR_H);
-    // 走廊中线
-    ctx.strokeStyle = '#152030';
-    ctx.setLineDash([6, 6]);
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(20, corridorY);
-    ctx.lineTo(mapW - 60, corridorY);
-    ctx.stroke();
-    ctx.setLineDash([]);
+    // 走廊
+    ctx.fillStyle='#0a1218';
+    ctx.fillRect(20,cy-CORRIDOR_H/2,mapW-40,CORRIDOR_H);
+    ctx.strokeStyle='#152030';ctx.setLineDash([6,6]);ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(20,cy);ctx.lineTo(mapW-60,cy);ctx.stroke();ctx.setLineDash([]);
 
     // 护士站
-    const nsX = mapW - 50, nsY = corridorY - 30;
-    ctx.fillStyle = '#0a1a30';
-    ctx.fillRect(nsX, nsY, 120, 60);
-    ctx.strokeStyle = '#0088ff';
-    ctx.lineWidth = 1.5;
-    ctx.strokeRect(nsX, nsY, 120, 60);
-    ctx.fillStyle = '#0088ff';
-    ctx.font = 'bold 11px Microsoft YaHei';
-    ctx.textAlign = 'center';
-    ctx.fillText('🏥 护士站', nsX + 60, nsY + 16);
-    ctx.fillStyle = '#4488aa';
-    ctx.font = '9px Microsoft YaHei';
-    ctx.fillText('巡检:' + stats.patrols + ' 预警:' + stats.warns, nsX + 60, nsY + 32);
-    ctx.fillText('运行 ' + Math.floor(stats.runtime / 60) + 'h' + Math.floor(stats.runtime % 60) + 'm', nsX + 60, nsY + 46);
+    var nx=mapW-50, ny=cy-30;
+    ctx.fillStyle='#0a1a30';ctx.fillRect(nx,ny,120,60);
+    ctx.strokeStyle='#0088ff';ctx.lineWidth=1.5;ctx.strokeRect(nx,ny,120,60);
+    ctx.fillStyle='#0088ff';ctx.font='bold 11px Microsoft YaHei';ctx.textAlign='center';
+    ctx.fillText('🏥 护士站',nx+60,ny+16);
+    ctx.fillStyle='#4488aa';ctx.font='9px Microsoft YaHei';
+    ctx.fillText('巡检:'+stats.patrols+' 预警:'+stats.warns,nx+60,ny+32);
+    ctx.fillText('运行 '+Math.floor(stats.runtime/60)+'h'+Math.floor(stats.runtime%60)+'m',nx+60,ny+46);
 
-    // 绘制20间病房
-    for (const rm of rooms) {
-        const p = patients[rm.id - 1];
-        const res = robot.results[rm.id - 1];
-        const dg = res.danger;
+    // 病房
+    for(var i=0;i<rooms.length;i++){
+        var rm=rooms[i], p=patients[rm.id-1], res=robot.results[rm.id-1];
+        var dg=res.danger;
 
-        // 背景
-        ctx.fillStyle = dg === D_FALL ? 'rgba(255,51,68,.1)' : dg === D_LEAVE ? 'rgba(255,136,0,.06)' : dg === D_SIT ? 'rgba(255,170,0,.04)' : '#081018';
-        ctx.fillRect(rm.x, rm.y, rm.w, rm.h);
-        // 边框
-        ctx.strokeStyle = dg >= D_FALL ? '#ff3344' : dg >= D_SIT ? '#ffaa00' : '#152535';
-        ctx.lineWidth = dg >= D_FALL ? 2 : 1;
-        ctx.strokeRect(rm.x, rm.y, rm.w, rm.h);
+        ctx.fillStyle=dg===D_FALL?'rgba(255,51,68,.1)':dg===D_LEAVE?'rgba(255,136,0,.06)':dg===D_SIT?'rgba(255,170,0,.04)':'#081018';
+        ctx.fillRect(rm.x,rm.y,rm.w,rm.h);
+        ctx.strokeStyle=dg>=D_FALL?'#ff3344':dg>=D_SIT?'#ffaa00':'#152535';
+        ctx.lineWidth=dg>=D_FALL?2:1;
+        ctx.strokeRect(rm.x,rm.y,rm.w,rm.h);
 
-        // 门
-        ctx.fillStyle = '#1a3050';
-        ctx.fillRect(rm.doorX - 6, rm.doorY - 2, 12, 4);
+        ctx.fillStyle='#1a3050';
+        ctx.fillRect(rm.doorX-6,rm.doorY-2,12,4);
 
-        // 病床
-        ctx.fillStyle = '#12202e';
-        ctx.fillRect(rm.bedX, rm.bedY, rm.bedW, rm.bedH);
-        ctx.strokeStyle = '#1a3045';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(rm.bedX, rm.bedY, rm.bedW, rm.bedH);
-        ctx.fillStyle = '#1a2838';
-        ctx.fillRect(rm.bedX + 2, rm.bedY + 2, 16, 10);
+        ctx.fillStyle='#12202e';ctx.fillRect(rm.bedX,rm.bedY,rm.bedW,rm.bedH);
+        ctx.strokeStyle='#1a3045';ctx.lineWidth=1;ctx.strokeRect(rm.bedX,rm.bedY,rm.bedW,rm.bedH);
+        ctx.fillStyle='#1a2838';ctx.fillRect(rm.bedX+2,rm.bedY+2,16,10);
 
-        // 病人
-        drawPatientOnBed(ctx, rm, p);
+        drawPatient(ctx,rm,p);
 
-        // 房号
-        ctx.fillStyle = '#4488aa';
-        ctx.font = 'bold 10px Microsoft YaHei';
-        ctx.textAlign = 'left';
-        ctx.fillText(rm.id + '号', rm.x + 3, rm.y + 11);
-        // 状态灯
-        ctx.beginPath();
-        ctx.arc(rm.x + rm.w - 8, rm.y + 8, 3, 0, Math.PI * 2);
-        ctx.fillStyle = dg >= D_FALL ? '#ff3344' : dg >= D_LEAVE ? '#ff8800' : dg >= D_SIT ? '#ffaa00' : '#00cc66';
-        ctx.fill();
+        ctx.fillStyle='#4488aa';ctx.font='bold 10px Microsoft YaHei';ctx.textAlign='left';
+        ctx.fillText(rm.id+'号',rm.x+3,rm.y+11);
+        ctx.beginPath();ctx.arc(rm.x+rm.w-8,rm.y+8,3,0,Math.PI*2);
+        ctx.fillStyle=dg>=D_FALL?'#ff3344':dg>=D_LEAVE?'#ff8800':dg>=D_SIT?'#ffaa00':'#00cc66';ctx.fill();
 
-        // 正在检查高亮
-        if (robot.currentRoom === rm.id) {
-            ctx.strokeStyle = '#0088ff';
-            ctx.lineWidth = 2;
-            ctx.setLineDash([3, 3]);
-            ctx.strokeRect(rm.x - 2, rm.y - 2, rm.w + 4, rm.h + 4);
-            ctx.setLineDash([]);
+        if(robot.curRoom===rm.id){
+            ctx.strokeStyle='#0088ff';ctx.lineWidth=2;ctx.setLineDash([3,3]);
+            ctx.strokeRect(rm.x-2,rm.y-2,rm.w+4,rm.h+4);ctx.setLineDash([]);
         }
-        // 选中高亮
-        if (selectedRoom === rm.id) {
-            ctx.strokeStyle = '#00ccff';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(rm.x - 3, rm.y - 3, rm.w + 6, rm.h + 6);
+        if(selectedRoom===rm.id){
+            ctx.strokeStyle='#00ccff';ctx.lineWidth=2;
+            ctx.strokeRect(rm.x-3,rm.y-3,rm.w+6,rm.h+6);
         }
     }
 
-    // 绘制机器人
+    // 机器人
     drawRobot(ctx);
 
-    // 走廊标注
-    ctx.fillStyle = '#1a3050';
-    ctx.font = '9px Microsoft YaHei';
-    ctx.textAlign = 'center';
-    ctx.fillText('← 入口', 50, corridorY - CORRIDOR_H / 2 - 4);
-    ctx.fillText('机器人巡航通道', mapW / 2 - 40, corridorY + 4);
+    ctx.fillStyle='#1a3050';ctx.font='9px Microsoft YaHei';ctx.textAlign='center';
+    ctx.fillText('← 入口',50,cy-CORRIDOR_H/2-4);
+    ctx.fillText('机器人巡航通道',mapW/2-40,cy+4);
 
     ctx.restore();
 }
 
-function drawPatientOnBed(ctx, rm, p) {
-    if (p.state === P_SLEEP && Math.random() < 0.7) return;
-    const bx = rm.bedX + rm.bedW / 2, by = rm.bedY + rm.bedH / 2;
-    ctx.save();
-    ctx.translate(bx, by);
-    ctx.rotate(p.angle * Math.PI / 180 * 0.8);
-    ctx.strokeStyle = '#3a6080';
-    ctx.lineWidth = 1.5;
-    ctx.lineCap = 'round';
-    // 头
-    ctx.beginPath();
-    ctx.arc(-12, -4, 4, 0, Math.PI * 2);
-    ctx.stroke();
-    // 身体
-    ctx.beginPath();
-    ctx.moveTo(-8, 0);
-    ctx.lineTo(12, 2);
-    ctx.stroke();
-    // 腿
-    if (p.state >= P_SIT) {
-        ctx.beginPath();
-        ctx.moveTo(12, 2);
-        ctx.lineTo(8, 10);
-        ctx.lineTo(4, 16);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(12, 2);
-        ctx.lineTo(15, 10);
-        ctx.lineTo(18, 16);
-        ctx.stroke();
+function drawPatient(c,rm,p) {
+    if(p.state===P_SLEEP&&Math.random()<0.7) return;
+    var bx=rm.bedX+rm.bedW/2, by=rm.bedY+rm.bedH/2;
+    c.save();c.translate(bx,by);c.rotate(p.angle*Math.PI/180*0.8);
+    c.strokeStyle='#3a6080';c.lineWidth=1.5;c.lineCap='round';
+    c.beginPath();c.arc(-12,-4,4,0,Math.PI*2);c.stroke();
+    c.beginPath();c.moveTo(-8,0);c.lineTo(12,2);c.stroke();
+    if(p.state>=P_SIT){
+        c.beginPath();c.moveTo(12,2);c.lineTo(8,10);c.lineTo(4,16);c.stroke();
+        c.beginPath();c.moveTo(12,2);c.lineTo(15,10);c.lineTo(18,16);c.stroke();
     } else {
-        ctx.beginPath();
-        ctx.moveTo(12, 2);
-        ctx.lineTo(26, 3);
-        ctx.stroke();
+        c.beginPath();c.moveTo(12,2);c.lineTo(26,3);c.stroke();
     }
-    // 危险标签
-    if (p.danger > D_SAFE) {
-        ctx.fillStyle = D_CLR[p.danger];
-        ctx.font = '7px Microsoft YaHei';
-        ctx.textAlign = 'center';
-        ctx.fillText(D_TXT[p.danger], 0, -14);
+    if(p.danger>D_SAFE){
+        c.fillStyle=D_CLR[p.danger];c.font='7px Microsoft YaHei';c.textAlign='center';
+        c.fillText(D_TXT[p.danger],0,-14);
     }
-    ctx.restore();
+    c.restore();
 }
 
-function drawRobot(ctx) {
-    ctx.save();
-    ctx.translate(robot.x, robot.y);
-    ctx.rotate(robot.heading);
-    const r = ROBOT_RADIUS;
-    // 超声波扇形
-    ctx.fillStyle = 'rgba(0,136,255,.04)';
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.arc(0, 0, 30, -0.4, 0.4);
-    ctx.closePath();
-    ctx.fill();
-    // 底盘
-    ctx.fillStyle = '#1a2a3a';
-    ctx.beginPath();
-    ctx.arc(0, 0, r, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = '#0088ff';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.arc(0, 0, r, 0, Math.PI * 2);
-    ctx.stroke();
-    // 内层
-    ctx.fillStyle = '#0d1a28';
-    ctx.beginPath();
-    ctx.arc(0, 0, r - 3, 0, Math.PI * 2);
-    ctx.fill();
-    // 摄像头
-    ctx.fillStyle = '#224466';
-    ctx.beginPath();
-    ctx.arc(0, -2, 4, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = '#0088ff';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.arc(0, -2, 4, 0, Math.PI * 2);
-    ctx.stroke();
-    // 方向箭头
-    ctx.fillStyle = '#0088ff';
-    ctx.beginPath();
-    ctx.moveTo(0, -r - 3);
-    ctx.lineTo(-3, -r);
-    ctx.lineTo(3, -r);
-    ctx.closePath();
-    ctx.fill();
-    // 指示灯
-    const blinkPhase = (Date.now() / 500) % 2;
-    ctx.beginPath();
-    ctx.arc(-r + 4, -r + 4, 1.5, 0, Math.PI * 2);
-    ctx.fillStyle = blinkPhase > 1 ? '#00cc66' : '#006633';
-    ctx.fill();
-    ctx.restore();
+function drawRobot(c) {
+    c.save();c.translate(robot.x,robot.y);c.rotate(robot.heading);
+    var r=14;
+    c.fillStyle='rgba(0,136,255,.04)';
+    c.beginPath();c.moveTo(0,0);c.arc(0,0,30,-.4,.4);c.closePath();c.fill();
+    c.fillStyle='#1a2a3a';c.beginPath();c.arc(0,0,r,0,Math.PI*2);c.fill();
+    c.strokeStyle='#0088ff';c.lineWidth=1.5;c.beginPath();c.arc(0,0,r,0,Math.PI*2);c.stroke();
+    c.fillStyle='#0d1a28';c.beginPath();c.arc(0,0,r-3,0,Math.PI*2);c.fill();
+    c.fillStyle='#224466';c.beginPath();c.arc(0,-2,4,0,Math.PI*2);c.fill();
+    c.strokeStyle='#0088ff';c.lineWidth=1;c.beginPath();c.arc(0,-2,4,0,Math.PI*2);c.stroke();
+    c.fillStyle='#0088ff';
+    c.beginPath();c.moveTo(0,-r-3);c.lineTo(-3,-r);c.lineTo(3,-r);c.closePath();c.fill();
+    var bp=(Date.now()/500)%2;
+    c.beginPath();c.arc(-r+4,-r+4,1.5,0,Math.PI*2);
+    c.fillStyle=bp>1?'#00cc66':'#006633';c.fill();
+    c.restore();
 
-    // 超声波波纹
-    if (robot.isRunning || robot.isNavigating) {
-        const wavePhase = (Date.now() / 200) % 3;
-        ctx.strokeStyle = 'rgba(0,136,255,' + (0.25 - wavePhase * 0.08) + ')';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.arc(robot.x, robot.y, 8 + wavePhase * 8, robot.heading - 0.3, robot.heading + 0.3);
-        ctx.stroke();
+    if(robot.isRunning||robot.isNav){
+        var wp=(Date.now()/200)%3;
+        c.strokeStyle='rgba(0,136,255,'+(0.25-wp*0.08)+')';c.lineWidth=1;
+        c.beginPath();c.arc(robot.x,robot.y,8+wp*8,robot.heading-0.3,robot.heading+0.3);c.stroke();
     }
 }
 
-// ============ 渲染摄像头画面 ============
-function renderCamera() {
-    const W = camCanvas.width, H = camCanvas.height;
-    camCtx.fillStyle = '#060a10';
-    camCtx.fillRect(0, 0, W, H);
+// ============ 摄像头渲染 ============
+function renderCam() {
+    var W=camCanvas.width, H=camCanvas.height;
+    camCtx.clearRect(0,0,W,H);
+    camCtx.fillStyle='#060a10';camCtx.fillRect(0,0,W,H);
+    var sy=(Date.now()/50)%H;
+    camCtx.strokeStyle='rgba(0,136,255,.08)';camCtx.lineWidth=1;
+    camCtx.beginPath();camCtx.moveTo(0,sy);camCtx.lineTo(W,sy);camCtx.stroke();
+    camCtx.strokeStyle='rgba(0,136,255,.02)';camCtx.lineWidth=0.5;
+    for(var x=0;x<W;x+=20){camCtx.beginPath();camCtx.moveTo(x,0);camCtx.lineTo(x,H);camCtx.stroke();}
+    for(var y=0;y<H;y+=20){camCtx.beginPath();camCtx.moveTo(0,y);camCtx.lineTo(W,y);camCtx.stroke();}
 
-    // 扫描线
-    const scanY = (Date.now() / 50) % H;
-    camCtx.strokeStyle = 'rgba(0,136,255,.08)';
-    camCtx.lineWidth = 1;
-    camCtx.beginPath();
-    camCtx.moveTo(0, scanY);
-    camCtx.lineTo(W, scanY);
-    camCtx.stroke();
+    var ap=null;
+    if(robot.curRoom>0) ap=patients[robot.curRoom-1];
 
-    // 网格
-    camCtx.strokeStyle = 'rgba(0,136,255,.02)';
-    camCtx.lineWidth = 0.5;
-    for (let x = 0; x < W; x += 20) { camCtx.beginPath(); camCtx.moveTo(x, 0); camCtx.lineTo(x, H); camCtx.stroke(); }
-    for (let y = 0; y < H; y += 20) { camCtx.beginPath(); camCtx.moveTo(0, y); camCtx.lineTo(W, y); camCtx.stroke(); }
-
-    // 找当前检查的病人
-    let activePatient = null;
-    if (robot.currentRoom > 0) activePatient = patients[robot.currentRoom - 1];
-
-    if (activePatient && activePatient.keypoints.length === 17) {
-        const sx = W / 120, sy = H / 100;
-        const connections = [[5,6],[5,7],[7,9],[6,8],[8,10],[5,11],[6,12],[11,12],[11,13],[13,15],[12,14],[14,16],[0,1],[0,2],[1,3],[2,4]];
-        camCtx.strokeStyle = '#00cc66';
-        camCtx.lineWidth = 2;
-        camCtx.lineCap = 'round';
-        for (const [a, b] of connections) {
-            if (activePatient.keypoints[a].c > 0.5 && activePatient.keypoints[b].c > 0.5) {
-                camCtx.beginPath();
-                camCtx.moveTo(activePatient.keypoints[a].x * sx, activePatient.keypoints[a].y * sy);
-                camCtx.lineTo(activePatient.keypoints[b].x * sx, activePatient.keypoints[b].y * sy);
-                camCtx.stroke();
-            }
-        }
-        for (let i = 0; i < 17; i++) {
-            if (activePatient.keypoints[i].c > 0.5) {
-                camCtx.beginPath();
-                camCtx.arc(activePatient.keypoints[i].x * sx, activePatient.keypoints[i].y * sy, 3, 0, Math.PI * 2);
-                camCtx.fillStyle = '#00ff88';
-                camCtx.fill();
-            }
-        }
-        // 包围框
-        camCtx.strokeStyle = D_CLR[activePatient.danger];
-        camCtx.lineWidth = 1;
-        camCtx.setLineDash([4, 2]);
-        camCtx.strokeRect(activePatient.bbox.x * sx, activePatient.bbox.y * sy, activePatient.bbox.w * sx, activePatient.bbox.h * sy);
-        camCtx.setLineDash([]);
-        // 信息
-        camCtx.fillStyle = D_CLR[activePatient.danger];
-        camCtx.font = 'bold 11px Consolas';
-        camCtx.textAlign = 'left';
-        camCtx.fillText('状态: ' + D_TXT[activePatient.danger], 6, H - 28);
-        camCtx.fillText('病房: ' + robot.currentRoom + '号', 6, H - 12);
-        camCtx.fillStyle = '#88aacc';
-        camCtx.font = '9px Consolas';
-        camCtx.fillText('θ=' + activePatient.angle.toFixed(1) + '° H=' + activePatient.hipHeight.toFixed(0), W - 100, H - 28);
-        camCtx.fillText('框:' + activePatient.bbox.w.toFixed(0) + '×' + activePatient.bbox.h.toFixed(0), W - 100, H - 12);
+    if(ap&&ap.kps.length===17){
+        var sx2=W/120,sy2=H/100;
+        var conn=[[5,6],[5,7],[7,9],[6,8],[8,10],[5,11],[6,12],[11,12],[11,13],[13,15],[12,14],[14,16],[0,1],[0,2],[1,3],[2,4]];
+        camCtx.strokeStyle='#00cc66';camCtx.lineWidth=2;camCtx.lineCap='round';
+        for(var i=0;i<conn.length;i++){var a=conn[i][0],b=conn[i][1];
+            if(ap.kps[a].c>.5&&ap.kps[b].c>.5){camCtx.beginPath();camCtx.moveTo(ap.kps[a].x*sx2,ap.kps[a].y*sy2);camCtx.lineTo(ap.kps[b].x*sx2,ap.kps[b].y*sy2);camCtx.stroke();}}
+        for(var i=0;i<17;i++){if(ap.kps[i].c>.5){camCtx.beginPath();camCtx.arc(ap.kps[i].x*sx2,ap.kps[i].y*sy2,3,0,Math.PI*2);camCtx.fillStyle='#00ff88';camCtx.fill();}}
+        camCtx.strokeStyle=D_CLR[ap.danger];camCtx.lineWidth=1;camCtx.setLineDash([4,2]);
+        camCtx.strokeRect(ap.bbox.x*sx2,ap.bbox.y*sy2,ap.bbox.w*sx2,ap.bbox.h*sy2);camCtx.setLineDash([]);
+        camCtx.fillStyle=D_CLR[ap.danger];camCtx.font='bold 11px Consolas';camCtx.textAlign='left';
+        camCtx.fillText('状态: '+D_TXT[ap.danger],6,H-28);
+        camCtx.fillText('病房: '+robot.curRoom+'号',6,H-12);
+        camCtx.fillStyle='#88aacc';camCtx.font='9px Consolas';
+        camCtx.fillText('θ='+ap.angle.toFixed(1)+'° H='+ap.hipH.toFixed(0),W-100,H-28);
+        camCtx.fillText('框:'+ap.bbox.w.toFixed(0)+'×'+ap.bbox.h.toFixed(0),W-100,H-12);
     } else {
-        camCtx.fillStyle = '#224466';
-        camCtx.font = '13px Microsoft YaHei';
-        camCtx.textAlign = 'center';
-        camCtx.fillText('巡航中... 扫描走廊环境', W / 2, H / 2);
-        camCtx.strokeStyle = 'rgba(0,136,255,.12)';
-        camCtx.lineWidth = 1;
-        for (let i = 0; i < 5; i++) {
-            const y = H / 2 - 20 + i * 10;
-            camCtx.beginPath();
-            camCtx.moveTo(W * 0.2, y);
-            camCtx.lineTo(W * 0.8, y);
-            camCtx.stroke();
-        }
+        camCtx.fillStyle='#224466';camCtx.font='13px Microsoft YaHei';camCtx.textAlign='center';
+        camCtx.fillText('巡航中... 扫描走廊环境',W/2,H/2);
+        camCtx.strokeStyle='rgba(0,136,255,.12)';camCtx.lineWidth=1;
+        for(var i=0;i<5;i++){var y=H/2-20+i*10;camCtx.beginPath();camCtx.moveTo(W*0.2,y);camCtx.lineTo(W*0.8,y);camCtx.stroke();}
     }
-    camCtx.fillStyle = 'rgba(0,204,102,.7)';
-    camCtx.font = '8px Consolas';
-    camCtx.textAlign = 'left';
-    camCtx.fillText('K230 KPU | ' + currentFps + 'FPS | INT8+FP16', 6, 14);
+    camCtx.fillStyle='rgba(0,204,102,.7)';camCtx.font='8px Consolas';camCtx.textAlign='left';
+    camCtx.fillText('K230 KPU | '+currentFps+'FPS | INT8+FP16',6,14);
 }
 
 // ============ 主循环 ============
-function gameLoop(timestamp) {
-    if (!lastTimestamp) lastTimestamp = timestamp;
-    const rawDt = (timestamp - lastTimestamp) / 1000;
-    lastTimestamp = timestamp;
+function loop(ts) {
+    if(!lastTs) lastTs=ts;
+    var raw=(ts-lastTs)/1000; lastTs=ts;
+    fpsCnt++;fpsTm+=raw;
+    if(fpsTm>=1){currentFps=fpsCnt;fpsCnt=0;fpsTm=0;}
+    document.getElementById('fps').textContent=currentFps;
 
-    // FPS计算
-    fpsCounter++;
-    fpsTimer += rawDt;
-    if (fpsTimer >= 1) { currentFps = fpsCounter; fpsCounter = 0; fpsTimer = 0; }
-    document.getElementById('fps').textContent = currentFps;
-
-    if (simOn) {
-        const dt = 1 / 60;
-        simTime += dt;
-        stats.runtime = simTime;
-        clockS += dt;
-        if (clockS >= 60) { clockS -= 60; clockM++; }
-        if (clockM >= 60) { clockM -= 60; clockH++; }
-        if (clockH >= 24) clockH = 0;
-
+    if(simOn){
+        var dt=1/60;
+        simTime+=dt; stats.runtime=simTime;
+        clockS+=dt;
+        if(clockS>=60){clockS-=60;clockM++;}
+        if(clockM>=60){clockM-=60;clockH++;}
+        if(clockH>=24) clockH=0;
         updateRobot(dt);
-        for (const p of patients) updatePatient(p, dt);
+        for(var i=0;i<patients.length;i++) updatePatient(patients[i],dt);
         updateUI();
     }
 
     renderMap();
-    renderCamera();
-    requestAnimationFrame(gameLoop);
+    renderCam();
+    requestAnimationFrame(loop);
 }
 
 // ============ UI更新 ============
 function updateUI() {
-    document.getElementById('simT').textContent = pad2(clockH) + ':' + pad2(clockM) + ':' + pad2(Math.floor(clockS));
+    document.getElementById('simT').textContent=p2(clockH)+':'+p2(clockM)+':'+p2(Math.floor(clockS));
+    if(robot.curRoom>0) document.getElementById('rsP').textContent=robot.curRoom+'号 检查中';
+    else if(robot.isNav) document.getElementById('rsP').textContent='→ '+robot.targetRoom+'号 快速前往';
+    else document.getElementById('rsP').textContent='巡航 → '+robot.targetRoom+'号';
+    document.getElementById('rsS').textContent=(robot.speed*8).toFixed(1)+' cm/s';
+    document.getElementById('rsH').textContent=(robot.heading*180/Math.PI).toFixed(1)+'°';
+    document.getElementById('rsO').textContent=robot.ultra<30?'⚠ '+robot.ultra.toFixed(0)+'cm':'安全 ('+robot.ultra.toFixed(0)+'cm)';
+    document.getElementById('rsPID').textContent=robot.pidL.toFixed(2)+'/'+robot.pidR.toFixed(2);
+    document.getElementById('rsIMU').textContent=(robot.filtAng*180/Math.PI).toFixed(1)+'°';
 
-    // 机器人状态
-    if (robot.currentRoom > 0) {
-        document.getElementById('rsP').textContent = robot.currentRoom + '号 检查中';
-    } else if (robot.isNavigating) {
-        document.getElementById('rsP').textContent = '→ ' + robot.patrolIdx + '号 快速前往';
-    } else {
-        document.getElementById('rsP').textContent = '巡航 → ' + robot.patrolIdx + '号';
-    }
-    document.getElementById('rsS').textContent = (robot.speed * 8).toFixed(1) + ' cm/s';
-    document.getElementById('rsH').textContent = (robot.heading * 180 / Math.PI).toFixed(1) + '°';
-    document.getElementById('rsO').textContent = robot.ultrasonic < 30 ? '⚠ ' + robot.ultrasonic.toFixed(0) + 'cm' : '安全 (' + robot.ultrasonic.toFixed(0) + 'cm)';
-    document.getElementById('rsPID').textContent = robot.pidL.output.toFixed(2) + '/' + robot.pidR.output.toFixed(2);
-    document.getElementById('rsIMU').textContent = (robot.filtAng * 180 / Math.PI).toFixed(1) + '°';
+    var md=D_SAFE;
+    for(var i=0;i<patients.length;i++) if(patients[i].danger>md) md=patients[i].danger;
+    var ab=document.getElementById('aBox');
+    ab.className='alert-box s'+md;
+    ab.textContent=md===D_SAFE?'● 安全 - 所有病房正常':(md===D_FALL?'🚨 ':'⚠ ')+D_TXT[md]+' - 存在高危状态';
 
-    // 报警状态
-    let maxDanger = D_SAFE;
-    for (const p of patients) { if (p.danger > maxDanger) maxDanger = p.danger; }
-    const aBox = document.getElementById('aBox');
-    aBox.className = 'alert-box s' + maxDanger;
-    aBox.textContent = maxDanger === D_SAFE ? '● 安全 - 所有病房正常' : (maxDanger === D_FALL ? '🚨 ' : '⚠ ') + D_TXT[maxDanger] + ' - 存在高危状态';
-
-    // 病房网格
-    for (let i = 0; i < 20; i++) {
-        const btn = document.getElementById('rb' + (i + 1));
-        if (!btn) continue;
-        const dg = robot.results[i].danger;
-        btn.className = 'rb ' + (dg >= D_FALL ? 'dng' : dg >= D_SIT ? 'wrn' : 'ok') + (selectedRoom === i + 1 ? ' sel' : '');
-        btn.querySelector('.rs').textContent = D_TXT[dg];
+    for(var i=0;i<20;i++){
+        var b=document.getElementById('rb'+(i+1));
+        if(!b)continue;
+        var dg=robot.results[i].danger;
+        b.className='rb '+(dg>=D_FALL?'dng':dg>=D_SIT?'wrn':'ok')+(selectedRoom===i+1?' sel':'');
+        b.querySelector('.rs').textContent=D_TXT[dg];
     }
 
-    // 统计
-    document.getElementById('sP').textContent = stats.patrols;
-    document.getElementById('sW').textContent = stats.warns;
-    document.getElementById('sA').textContent = stats.alarms;
-    document.getElementById('sT').textContent = Math.floor(stats.runtime / 60) + 'h';
+    document.getElementById('sP').textContent=stats.patrols;
+    document.getElementById('sW').textContent=stats.warns;
+    document.getElementById('sA').textContent=stats.alarms;
+    document.getElementById('sT').textContent=Math.floor(stats.runtime/60)+'h';
 
-    // 指示灯
-    const dot = document.getElementById('rDot');
-    dot.className = 'dot ' + (maxDanger >= D_FALL ? 'dr' : maxDanger >= D_SIT ? 'dy' : 'dg');
-    document.getElementById('rTxt').textContent = maxDanger >= D_FALL ? '⚠ 坠床警报' : maxDanger >= D_SIT ? '预警中' : '巡检中';
+    var dot=document.getElementById('rDot');
+    dot.className='dot '+(md>=D_FALL?'dr':md>=D_SIT?'dy':'dg');
+    document.getElementById('rTxt').textContent=md>=D_FALL?'⚠ 坠床警报':md>=D_SIT?'预警中':'巡检中';
 
-    // 病房详情
-    updateRoomDetail();
+    updateDetail();
 }
 
-function updateRoomDetail() {
-    const el = document.getElementById('rDet');
-    if (selectedRoom < 0) { el.innerHTML = '<h4>点击地图中的病房查看详情</h4>'; return; }
-    const p = patients[selectedRoom - 1], r = robot.results[selectedRoom - 1];
-    el.innerHTML = '<h4>' + selectedRoom + '号病房 实时状态</h4>' +
-        '<div class="rd-r"><span class="k">病人状态</span><span class="v" style="color:' + D_CLR[p.danger] + '">' + P_TXT[p.state] + '</span></div>' +
-        '<div class="rd-r"><span class="k">FSM码</span><span class="v">0x0' + p.danger + ' (' + D_TXT[p.danger] + ')</span></div>' +
-        '<div class="rd-r"><span class="k">肩髋夹角</span><span class="v">' + p.angle.toFixed(1) + '°</span></div>' +
-        '<div class="rd-r"><span class="k">髋部高度</span><span class="v">' + p.hipHeight.toFixed(0) + 'px</span></div>' +
-        '<div class="rd-r"><span class="k">下落速度</span><span class="v">' + p.fallVelocity.toFixed(2) + ' m/s</span></div>' +
-        '<div class="rd-r"><span class="k">骨骼框</span><span class="v">' + p.bbox.w.toFixed(0) + '×' + p.bbox.h.toFixed(0) + '</span></div>' +
-        '<div class="rd-r"><span class="k">上次检查</span><span class="v">' + (r.lastTime > 0 ? formatTime(r.lastTime) : '未检查') + '</span></div>' +
-        '<div class="rd-r"><span class="k">状态持续</span><span class="v">' + p.stateTimer.toFixed(1) + 's</span></div>';
+function updateDetail() {
+    var el=document.getElementById('rDet');
+    if(selectedRoom<0){el.innerHTML='<h4>点击地图中的病房查看详情</h4>';return;}
+    var p=patients[selectedRoom-1], r=robot.results[selectedRoom-1];
+    el.innerHTML='<h4>'+selectedRoom+'号病房 实时状态</h4>'+
+    '<div class="rd-r"><span class="k">病人状态</span><span class="v" style="color:'+D_CLR[p.danger]+'">'+P_TXT[p.state]+'</span></div>'+
+    '<div class="rd-r"><span class="k">FSM码</span><span class="v">0x0'+p.danger+' ('+D_TXT[p.danger]+')</span></div>'+
+    '<div class="rd-r"><span class="k">肩髋夹角</span><span class="v">'+p.angle.toFixed(1)+'°</span></div>'+
+    '<div class="rd-r"><span class="k">髋部高度</span><span class="v">'+p.hipH.toFixed(0)+'px</span></div>'+
+    '<div class="rd-r"><span class="k">下落速度</span><span class="v">'+p.fallV.toFixed(2)+' m/s</span></div>'+
+    '<div class="rd-r"><span class="k">骨骼框</span><span class="v">'+p.bbox.w.toFixed(0)+'×'+p.bbox.h.toFixed(0)+'</span></div>'+
+    '<div class="rd-r"><span class="k">上次检查</span><span class="v">'+(r.lt>0?fmtT(r.lt):'未检查')+'</span></div>'+
+    '<div class="rd-r"><span class="k">状态持续</span><span class="v">'+p.st.toFixed(1)+'s</span></div>';
 }
 
-// ============ 病房网格 ============
+// ============ 网格 ============
 function buildGrid() {
-    const grid = document.getElementById('rGrid');
-    grid.innerHTML = '';
-    for (let i = 1; i <= 20; i++) {
-        const div = document.createElement('div');
-        div.className = 'rb ok';
-        div.id = 'rb' + i;
-        div.innerHTML = '<div class="rn">' + i + '</div><div class="rs">安全</div>';
-        div.onclick = function() { onRoomClick(i); };
-        grid.appendChild(div);
+    var g=document.getElementById('rGrid'); g.innerHTML='';
+    for(var i=1;i<=20;i++){
+        var d=document.createElement('div');
+        d.className='rb ok'; d.id='rb'+i;
+        d.innerHTML='<div class="rn">'+i+'</div><div class="rs">安全</div>';
+        d.onclick=(function(id){return function(){roomClick(id);};})(i);
+        g.appendChild(d);
     }
 }
 
-// ============ 事件处理 ============
-function onRoomClick(id) {
-    selectedRoom = selectedRoom === id ? -1 : id;
-    if (selectedRoom > 0) summonRobot(id);
+// ============ 事件 ============
+function roomClick(id) {
+    selectedRoom=selectedRoom===id?-1:id;
+    if(selectedRoom>0) summonRobot(id);
 }
 
-function onCanvasClick(e) {
-    const rect = canvas.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-    const { ox, oy, scale } = mapTransform;
-    const mapX = (mouseX - ox) / scale;
-    const mapY = (mouseY - oy) / scale;
-
-    for (const rm of rooms) {
-        if (mapX >= rm.x && mapX <= rm.x + rm.w && mapY >= rm.y && mapY <= rm.y + rm.h) {
-            selectedRoom = selectedRoom === rm.id ? -1 : rm.id;
-            if (selectedRoom > 0) summonRobot(rm.id);
+function onMapClick(e) {
+    var rect=canvas.getBoundingClientRect();
+    var mx=e.clientX-rect.left, my=e.clientY-rect.top;
+    var mx2=(mx-mapT.ox)/mapT.s, my2=(my-mapT.oy)/mapT.s;
+    for(var i=0;i<rooms.length;i++){
+        var rm=rooms[i];
+        if(mx2>=rm.x&&mx2<=rm.x+rm.w&&my2>=rm.y&&my2<=rm.y+rm.h){
+            selectedRoom=selectedRoom===rm.id?-1:rm.id;
+            if(selectedRoom>0) summonRobot(rm.id);
             return;
         }
     }
-    selectedRoom = -1;
+    selectedRoom=-1;
 }
 
-function summonRobot(roomId) {
-    const pos = getRoomDoorPos(roomId);
-    robot.navTarget = { x: pos.x, y: pos.y, roomId: roomId };
-    robot.patrolIdx = roomId;
-    robot.isNavigating = true;
-    robot.currentRoom = 0;
-    robot.checkTimer = 0;
-    addLog(roomId, '召唤机器人前往', 's');
+function summonRobot(rid) {
+    var pos=doorPos(rid);
+    robot.navTarget={x:pos.x,y:pos.y,rid:rid};
+    robot.targetRoom=rid;
+    robot.isNav=true;
+    robot.curRoom=0;
+    robot.checkT=0;
+    addLog(rid,'召唤机器人前往','s');
 }
 
-function addLog(roomId, msg, level) {
-    const timeStr = pad2(clockH) + ':' + pad2(clockM) + ':' + pad2(Math.floor(clockS));
-    logs.unshift({ t: timeStr, rid: roomId, msg: msg, lvl: level });
-    if (logs.length > 50) logs.pop();
-    document.getElementById('aLog').innerHTML = logs.map(function(l) {
-        return '<div class="le"><span class="t">' + l.t + '</span><span class="r">' + l.rid + '号</span><span class="m ' + l.lvl + '">' + l.msg + '</span></div>';
-    }).join('');
+function addLog(rid,msg,lvl) {
+    var t=p2(clockH)+':'+p2(clockM)+':'+p2(Math.floor(clockS));
+    logs.unshift({t:t,rid:rid,msg:msg,lvl:lvl});
+    if(logs.length>50) logs.pop();
+    var h='';
+    for(var i=0;i<logs.length;i++){
+        var l=logs[i];
+        h+='<div class="le"><span class="t">'+l.t+'</span><span class="r">'+l.rid+'号</span><span class="m '+l.lvl+'">'+l.msg+'</span></div>';
+    }
+    document.getElementById('aLog').innerHTML=h;
 }
 
 function sendMQTT(p) {
-    const payload = { bed: p.roomId, danger: p.danger, box_w: Math.round(p.bbox.w), box_h: Math.round(p.bbox.h), ts: Math.floor(simTime) };
-    document.getElementById('mBox').textContent = JSON.stringify(payload, null, 2);
+    var pl={bed:p.rid,danger:p.danger,box_w:Math.round(p.bbox.w),box_h:Math.round(p.bbox.h),ts:Math.floor(simTime)};
+    document.getElementById('mBox').textContent=JSON.stringify(pl,null,2);
 }
 
 function toggleSim() {
-    simOn = !simOn;
-    const btn = document.getElementById('btnPlay');
-    btn.textContent = simOn ? '⏸ 暂停' : '▶ 运行';
-    if (simOn) btn.classList.add('on'); else btn.classList.remove('on');
+    simOn=!simOn;
+    var b=document.getElementById('btnPlay');
+    b.textContent=simOn?'⏸ 暂停':'▶ 运行';
+    if(simOn) b.classList.add('on'); else b.classList.remove('on');
 }
-
-function setSpd(s) {
-    speedMultiplier = s;
-    document.getElementById('spdT').textContent = s + 'x';
-}
-
+function setSpd(s) { speedMul=s; document.getElementById('spdT').textContent=s+'x'; }
 function resetSim() {
-    simTime = 0; clockH = 22; clockM = 0; clockS = 0;
-    stats = { patrols: 0, warns: 0, alarms: 0, runtime: 0 };
-    logs = [];
-    document.getElementById('aLog').innerHTML = '';
-    robot = createRobot();
-    for (let i = 0; i < 20; i++) patients[i] = createPatient(i + 1);
+    simTime=0;clockH=22;clockM=0;clockS=0;
+    stats={patrols:0,warns:0,alarms:0,runtime:0};logs=[];
+    document.getElementById('aLog').innerHTML='';
+    robot=makeRobot();
+    for(var i=0;i<20;i++) patients[i]=makePatient(i+1);
 }
-
 function trigEvt() {
-    const idx = Math.floor(Math.random() * 20);
-    const p = patients[idx];
-    if (p.state === P_SLEEP) { p.state = P_SIT; p.stateTimer = 0; addLog(idx + 1, '手动:坐起', 'w'); }
-    else if (p.state === P_SIT || p.state === P_WAKE) { p.state = P_LEGS; p.stateTimer = 0; addLog(idx + 1, '手动:离床', 'w'); }
-    else if (p.state >= P_LEGS) { p.state = P_FALLING; p.stateTimer = 0; p.fallVelocity = 0; addLog(idx + 1, '手动:坠床', 'd'); }
+    var idx=Math.floor(Math.random()*20), p=patients[idx];
+    if(p.state===P_SLEEP){p.state=P_SIT;p.st=0;addLog(idx+1,'手动:坐起','w');}
+    else if(p.state===P_SIT||p.state===P_WAKE){p.state=P_LEGS;p.st=0;addLog(idx+1,'手动:离床','w');}
+    else if(p.state>=P_LEGS){p.state=P_FALLING;p.st=0;p.fallV=0;addLog(idx+1,'手动:坠床','d');}
 }
 
-function pad2(n) { return String(Math.floor(n)).padStart(2, '0'); }
-function formatTime(seconds) { return pad2(seconds / 60) + ':' + pad2(seconds % 60); }
+function p2(n){return String(Math.floor(n)).padStart(2,'0');}
+function fmtT(s){return p2(s/60)+':'+p2(s%60);}
 </script>
 </body>
 </html>
