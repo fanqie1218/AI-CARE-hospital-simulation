@@ -906,19 +906,25 @@
             addMqttLog('bed/set', JSON.stringify({ bed_id: bedNum }));
             addAlarm('safe', '机器人前往 ' + bedNum + ' 号病房...');
 
+            // 更新骨骼显示 - 移动中状态
+            skeletonRoomLabel = '前往' + bedNum + '号病房...';
+            skeletonStatusColor = '#0088ff';
+            changePose('lying');
+
             // 3秒倒计时移动
             navigateCountdown = 3;
             const statusBed = document.getElementById('statusBed');
             const statusLevel = document.getElementById('statusLevel');
 
-            updateStatus('safe');
             statusLevel.textContent = '前往中';
+            statusLevel.className = 'status-level status-safe';
             statusBed.textContent = bedNum + '号 (倒计时' + navigateCountdown + 's)';
 
             navigateTimer = setInterval(() => {
                 navigateCountdown--;
                 if (navigateCountdown > 0) {
                     statusBed.textContent = bedNum + '号 (倒计时' + navigateCountdown + 's)';
+                    skeletonRoomLabel = '前往' + bedNum + '号病房... (' + navigateCountdown + 's)';
                 } else {
                     clearInterval(navigateTimer);
                     navigateTimer = null;
@@ -1023,8 +1029,8 @@
                 // 随机模拟状态
                 const rand = Math.random();
                 let status = 'safe';
-                if (rand < 0.05) status = 'sit';
-                else if (rand < 0.02) status = 'prepare';
+                if (rand < 0.08) status = 'sit';
+                else if (rand < 0.03) status = 'prepare';
                 updateStatus(status);
 
                 addMqttLog('patrol/bed', JSON.stringify({ bed_id: patrolBedIndex, status: status }));
@@ -1075,6 +1081,12 @@
             const poseMap = { safe: 'lying', sit: 'sitting', prepare: 'leaving', fall: 'falling' };
             state.skeletonPose = poseMap[newStatus];
             document.getElementById('poseLabel').textContent = '姿态: ' + poseConfig[state.skeletonPose];
+
+            // 联动骨骼显示
+            changePose(state.skeletonPose);
+            skeletonRoomLabel = state.currentBed + '号病房 | ' + poseConfig[state.skeletonPose];
+            const colorMap = { safe: '#00cc66', sit: '#ffaa00', prepare: '#ff8800', fall: '#ff3344' };
+            skeletonStatusColor = colorMap[newStatus] || '#00cc66';
 
             // 如果是危险状态，添加报警
             if (newStatus === 'fall') {
@@ -1337,9 +1349,13 @@
             ]
         };
 
-        let currentPosePoints = [...poses.lying];
-        let targetPosePoints = [...poses.lying];
+        let currentPosePoints = poses.lying.map(p => ({ ...p }));
+        let targetPosePoints = poses.lying.map(p => ({ ...p }));
         let animProgress = 1;
+        let breathPhase = 0;
+        let microMovePhase = 0;
+        let skeletonRoomLabel = '待机中';
+        let skeletonStatusColor = '#00cc66';
 
         function drawSkeleton() {
             const w = canvas.width;
@@ -1348,7 +1364,7 @@
             ctx.clearRect(0, 0, w, h);
 
             // 绘制背景网格
-            ctx.strokeStyle = 'rgba(0, 102, 204, 0.1)';
+            ctx.strokeStyle = 'rgba(0, 102, 204, 0.08)';
             ctx.lineWidth = 1;
             for (let i = 0; i < w; i += 30) {
                 ctx.beginPath();
@@ -1363,6 +1379,13 @@
                 ctx.stroke();
             }
 
+            // 呼吸和微动效果
+            breathPhase += 0.03;
+            microMovePhase += 0.05;
+            const breathOffset = Math.sin(breathPhase) * 0.008;
+            const microX = Math.sin(microMovePhase) * 0.003;
+            const microY = Math.cos(microMovePhase * 0.7) * 0.002;
+
             // 插值动画
             if (animProgress < 1) {
                 animProgress += 0.05;
@@ -1375,36 +1398,40 @@
             }
 
             // 绘制连线
-            ctx.strokeStyle = '#0066CC';
+            ctx.strokeStyle = skeletonStatusColor;
             ctx.lineWidth = 3;
             ctx.lineCap = 'round';
 
             skeletonConnections.forEach(([a, b]) => {
                 if (a < currentPosePoints.length && b < currentPosePoints.length) {
+                    const pa = currentPosePoints[a], pb = currentPosePoints[b];
+                    const breathA = a < 12 ? breathOffset : 0;
+                    const breathB = b < 12 ? breathOffset : 0;
                     ctx.beginPath();
-                    ctx.moveTo(currentPosePoints[a].x * w, currentPosePoints[a].y * h);
-                    ctx.lineTo(currentPosePoints[b].x * w, currentPosePoints[b].y * h);
+                    ctx.moveTo((pa.x + microX) * w, (pa.y + breathA + microY) * h);
+                    ctx.lineTo((pb.x + microX) * w, (pb.y + breathB + microY) * h);
                     ctx.stroke();
                 }
             });
 
             // 绘制关键点
             currentPosePoints.forEach((point, index) => {
-                const x = point.x * w;
-                const y = point.y * h;
+                const breathOff = index < 12 ? breathOffset : 0;
+                const x = (point.x + microX) * w;
+                const y = (point.y + breathOff + microY) * h;
                 const radius = index === 0 ? 12 : 6;
 
                 // 发光效果
                 const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius * 2);
-                gradient.addColorStop(0, 'rgba(0, 204, 102, 0.8)');
-                gradient.addColorStop(1, 'rgba(0, 204, 102, 0)');
+                gradient.addColorStop(0, skeletonStatusColor + 'cc');
+                gradient.addColorStop(1, skeletonStatusColor + '00');
                 ctx.fillStyle = gradient;
                 ctx.beginPath();
                 ctx.arc(x, y, radius * 2, 0, Math.PI * 2);
                 ctx.fill();
 
                 // 实心点
-                ctx.fillStyle = index === 0 ? '#00cc66' : '#00aaff';
+                ctx.fillStyle = index === 0 ? skeletonStatusColor : '#00aaff';
                 ctx.beginPath();
                 ctx.arc(x, y, radius, 0, Math.PI * 2);
                 ctx.fill();
@@ -1414,6 +1441,49 @@
                 ctx.lineWidth = 2;
                 ctx.stroke();
             });
+
+            // 顶部信息栏
+            ctx.fillStyle = 'rgba(0,0,0,0.6)';
+            ctx.fillRect(0, 0, w, 28);
+            ctx.fillStyle = skeletonStatusColor;
+            ctx.font = 'bold 11px Consolas';
+            ctx.textAlign = 'left';
+            ctx.fillText('● K230 KPU | 32FPS | ' + skeletonRoomLabel, 8, 18);
+
+            // 右上角状态码
+            ctx.textAlign = 'right';
+            ctx.fillStyle = '#88aacc';
+            ctx.font = '10px Consolas';
+            const statusCodes = { 'safe': '0x00', 'sit': '0x01', 'prepare': '0x02', 'fall': '0x03' };
+            ctx.fillText('STATUS: ' + (statusCodes[state.currentStatus] || '0x00'), w - 8, 18);
+
+            // 底部隐私标识
+            ctx.fillStyle = 'rgba(0,0,0,0.6)';
+            ctx.fillRect(0, h - 24, w, 24);
+            ctx.fillStyle = '#ffaa00';
+            ctx.font = '9px Microsoft YaHei';
+            ctx.textAlign = 'left';
+            ctx.fillText('🔒 隐私脱敏 | 原始图像不出端 | 仅传骨骼坐标', 8, h - 8);
+
+            // 包围框
+            let minX=1,minY=1,maxX=0,maxY=0;
+            currentPosePoints.forEach(p => {
+                if(p.x<minX)minX=p.x;if(p.y<minY)minY=p.y;
+                if(p.x>maxX)maxX=p.x;if(p.y>maxY)maxY=p.y;
+            });
+            ctx.strokeStyle = skeletonStatusColor + '66';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([4,4]);
+            ctx.strokeRect((minX-0.02)*w, (minY-0.02)*h, (maxX-minX+0.04)*w, (maxY-minY+0.04)*h);
+            ctx.setLineDash([]);
+
+            // 框尺寸标注
+            ctx.fillStyle = '#668899';
+            ctx.font = '9px Consolas';
+            ctx.textAlign = 'right';
+            const boxW = Math.round((maxX-minX)*w);
+            const boxH = Math.round((maxY-minY)*h);
+            ctx.fillText(boxW+'×'+boxH+'px', (maxX+0.02)*w, (minY-0.02)*h - 4);
         }
 
         function changePose(poseName) {
