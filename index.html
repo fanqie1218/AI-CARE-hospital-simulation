@@ -637,7 +637,7 @@
                     <div class="clock-period" id="clockPeriod"><span class="period-name">夜间巡检</span> 高危时段</div>
                 </div>
             </div>
-            <a class="nav-btn" href="simulation.html" title="打开机器人仿真系统">🤖 机器人仿真</a>
+            <a class="nav-btn" href="hospital_simulation.html" title="打开机器人仿真系统">🤖 机器人仿真</a>
         </div>
     </div>
 
@@ -649,7 +649,7 @@
             <div class="card">
                 <div class="card-title">床位号录入</div>
                 <div class="bed-input-group">
-                    <input type="number" class="bed-input" id="bedInput" min="1" max="255" placeholder="1-255" value="1">
+                    <input type="number" class="bed-input" id="bedInput" min="1" max="20" placeholder="1-20" value="1">
                     <button class="btn-confirm" onclick="confirmBed()">确认</button>
                 </div>
                 <div class="current-bed-display">
@@ -660,13 +660,23 @@
                     <button class="btn-quick-bed active" onclick="selectQuickBed(1)">1</button>
                     <button class="btn-quick-bed" onclick="selectQuickBed(2)">2</button>
                     <button class="btn-quick-bed" onclick="selectQuickBed(3)">3</button>
+                    <button class="btn-quick-bed" onclick="selectQuickBed(4)">4</button>
                     <button class="btn-quick-bed" onclick="selectQuickBed(5)">5</button>
+                    <button class="btn-quick-bed" onclick="selectQuickBed(6)">6</button>
+                    <button class="btn-quick-bed" onclick="selectQuickBed(7)">7</button>
                     <button class="btn-quick-bed" onclick="selectQuickBed(8)">8</button>
+                    <button class="btn-quick-bed" onclick="selectQuickBed(9)">9</button>
                     <button class="btn-quick-bed" onclick="selectQuickBed(10)">10</button>
+                    <button class="btn-quick-bed" onclick="selectQuickBed(11)">11</button>
                     <button class="btn-quick-bed" onclick="selectQuickBed(12)">12</button>
+                    <button class="btn-quick-bed" onclick="selectQuickBed(13)">13</button>
+                    <button class="btn-quick-bed" onclick="selectQuickBed(14)">14</button>
                     <button class="btn-quick-bed" onclick="selectQuickBed(15)">15</button>
+                    <button class="btn-quick-bed" onclick="selectQuickBed(16)">16</button>
+                    <button class="btn-quick-bed" onclick="selectQuickBed(17)">17</button>
+                    <button class="btn-quick-bed" onclick="selectQuickBed(18)">18</button>
+                    <button class="btn-quick-bed" onclick="selectQuickBed(19)">19</button>
                     <button class="btn-quick-bed" onclick="selectQuickBed(20)">20</button>
-                    <button class="btn-quick-bed" onclick="selectQuickBed(25)">25</button>
                 </div>
             </div>
 
@@ -859,31 +869,68 @@
         updateTime();
 
         // ========== 床位控制 ==========
+        let navigateTimer = null;
+        let navigateCountdown = 0;
+
         function confirmBed() {
             const input = document.getElementById('bedInput');
             let bedNum = parseInt(input.value);
 
-            if (isNaN(bedNum) || bedNum < 1 || bedNum > 255) {
-                alert('请输入有效的床位号 (1-255)');
+            if (isNaN(bedNum) || bedNum < 1 || bedNum > 20) {
+                alert('请输入有效的床位号 (1-20)');
                 return;
             }
 
-            state.currentBed = bedNum;
-            updateBedDisplay();
-            addMqttLog('bed/set', JSON.stringify({ bed_id: bedNum }));
+            navigateToBed(bedNum);
         }
 
         function selectQuickBed(num) {
-            state.currentBed = num;
             document.getElementById('bedInput').value = num;
-            updateBedDisplay();
+            navigateToBed(num);
 
             // 更新快捷按钮状态
             document.querySelectorAll('.btn-quick-bed').forEach(btn => {
                 btn.classList.toggle('active', parseInt(btn.textContent) === num);
             });
+        }
 
-            addMqttLog('bed/set', JSON.stringify({ bed_id: num }));
+        function navigateToBed(bedNum) {
+            // 清除之前的定时器
+            if (navigateTimer) {
+                clearInterval(navigateTimer);
+                navigateTimer = null;
+            }
+
+            state.currentBed = bedNum;
+            updateBedDisplay();
+            addMqttLog('bed/set', JSON.stringify({ bed_id: bedNum }));
+            addAlarm('safe', '机器人前往 ' + bedNum + ' 号病房...');
+
+            // 3秒倒计时移动
+            navigateCountdown = 3;
+            const statusBed = document.getElementById('statusBed');
+            const statusLevel = document.getElementById('statusLevel');
+
+            updateStatus('safe');
+            statusLevel.textContent = '前往中';
+            statusBed.textContent = bedNum + '号 (倒计时' + navigateCountdown + 's)';
+
+            navigateTimer = setInterval(() => {
+                navigateCountdown--;
+                if (navigateCountdown > 0) {
+                    statusBed.textContent = bedNum + '号 (倒计时' + navigateCountdown + 's)';
+                } else {
+                    clearInterval(navigateTimer);
+                    navigateTimer = null;
+                    statusBed.textContent = String(bedNum).padStart(3, '0');
+                    addAlarm('safe', '已到达 ' + bedNum + ' 号病房，开始检查');
+
+                    // 到达后随机模拟一个状态
+                    const statuses = ['safe', 'safe', 'safe', 'sit', 'safe'];
+                    const randomStatus = statuses[Math.floor(Math.random() * statuses.length)];
+                    updateStatus(randomStatus);
+                }
+            }, 1000);
         }
 
         function updateBedDisplay() {
@@ -894,10 +941,22 @@
         }
 
         // ========== 巡检控制 ==========
+        let patrolTimer = null;
+        let patrolBedIndex = 0;
+        let patrolDirection = 1; // 1=正向, -1=反向
+
         function resetPatrol() {
+            // 停止当前巡检
+            if (patrolTimer) {
+                clearInterval(patrolTimer);
+                patrolTimer = null;
+            }
             state.patrolProgress = 0;
             state.isPatrolling = false;
+            patrolBedIndex = 0;
+            patrolDirection = 1;
             updatePatrolUI();
+            updateProgress(0);
             addMqttLog('patrol/reset', JSON.stringify({ action: 'reset' }));
             addAlarm('safe', '巡检路径已重置');
         }
@@ -905,15 +964,78 @@
         function togglePatrol() {
             state.isPatrolling = !state.isPatrolling;
             updatePatrolUI();
-            addMqttLog('patrol/toggle', JSON.stringify({ running: state.isPatrolling }));
+
+            if (state.isPatrolling) {
+                addAlarm('safe', '开始自动巡检 20 间病房');
+                addMqttLog('patrol/start', JSON.stringify({ running: true }));
+                startAutoPatrol();
+            } else {
+                if (patrolTimer) {
+                    clearInterval(patrolTimer);
+                    patrolTimer = null;
+                }
+                addAlarm('safe', '巡检已暂停');
+                addMqttLog('patrol/pause', JSON.stringify({ running: false }));
+            }
         }
 
         function stopPatrol() {
+            if (patrolTimer) {
+                clearInterval(patrolTimer);
+                patrolTimer = null;
+            }
             state.isPatrolling = false;
             state.patrolProgress = 0;
+            patrolBedIndex = 0;
+            patrolDirection = 1;
             updatePatrolUI();
+            updateProgress(0);
             addMqttLog('patrol/stop', JSON.stringify({ action: 'emergency_stop' }));
-            addAlarm('safe', '紧急停止已触发');
+            addAlarm('safe', '紧急停止已触发，机器人已停在当前位置');
+        }
+
+        function startAutoPatrol() {
+            if (patrolTimer) clearInterval(patrolTimer);
+
+            patrolTimer = setInterval(() => {
+                if (!state.isPatrolling) return;
+
+                patrolBedIndex += patrolDirection;
+
+                // 到达端点时反向
+                if (patrolBedIndex > 20) {
+                    patrolBedIndex = 19;
+                    patrolDirection = -1;
+                } else if (patrolBedIndex < 1) {
+                    patrolBedIndex = 2;
+                    patrolDirection = 1;
+                }
+
+                // 更新当前床位
+                state.currentBed = patrolBedIndex;
+                document.getElementById('bedInput').value = patrolBedIndex;
+                updateBedDisplay();
+
+                // 更新进度
+                const progress = Math.round((patrolBedIndex / 20) * 100);
+                updateProgress(progress);
+
+                // 随机模拟状态
+                const rand = Math.random();
+                let status = 'safe';
+                if (rand < 0.05) status = 'sit';
+                else if (rand < 0.02) status = 'prepare';
+                updateStatus(status);
+
+                addMqttLog('patrol/bed', JSON.stringify({ bed_id: patrolBedIndex, status: status }));
+                addAlarm('safe', '巡检至 ' + patrolBedIndex + ' 号病房 - ' + (status === 'safe' ? '正常' : '异常'));
+
+            }, 3000); // 每3秒检查一间房
+        }
+
+        function updateProgress(percent) {
+            document.getElementById('progressFill').style.width = percent + '%';
+            document.getElementById('progressText').textContent = percent + '%';
         }
 
         function updatePatrolUI() {
