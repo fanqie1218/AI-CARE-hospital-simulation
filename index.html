@@ -61,6 +61,14 @@ body{font-family:'Microsoft YaHei',sans-serif;background:#080c18;color:#d0dce8;h
 .mqtt{background:#060c14;border:1px solid #1e3050;border-radius:3px;padding:5px;font-size:9px;font-family:Consolas;color:#66aadd;max-height:60px;overflow-y:auto;white-space:pre-wrap}
 .sts{display:flex;justify-content:space-around;padding:4px 0}
 .sts-i{text-align:center}.sts-n{font-size:18px;font-weight:bold;color:#0088ff}.sts-l{font-size:9px;color:#5580aa}
+.sim-clock{display:flex;align-items:center;gap:8px;background:rgba(0,136,255,.08);border:1px solid rgba(0,136,255,.2);border-radius:6px;padding:4px 12px}
+.sim-clock .clock-icon{font-size:16px;animation:clockPulse 2s infinite}
+@keyframes clockPulse{0%,100%{opacity:1}50%{opacity:.6}}
+.sim-clock .clock-time{font-size:16px;font-weight:bold;color:#0088ff;font-family:Consolas,'Courier New',monospace;letter-spacing:1px}
+.sim-clock .clock-time .blink-colon{animation:colonBlink 1s infinite}
+@keyframes colonBlink{0%,100%{opacity:1}50%{opacity:.3}}
+.sim-clock .clock-period{font-size:10px;color:#5580aa;border-left:1px solid rgba(0,136,255,.2);padding-left:8px;line-height:1.2}
+.sim-clock .clock-period .period-name{color:#88bbee;font-weight:bold}
 </style>
 </head>
 <body>
@@ -69,7 +77,13 @@ body{font-family:'Microsoft YaHei',sans-serif;background:#080c18;color:#d0dce8;h
 <div class="hdr-r">
 <span><span class="dot dg"></span>系统在线</span>
 <span><span class="dot dg" id="rDot"></span><span id="rTxt">巡检中</span></span>
-<span>仿真时间 <b id="simT" style="color:#0088ff">22:00:00</b></span>
+<div class="sim-clock">
+<span class="clock-icon" id="clockIcon">🌙</span>
+<div>
+<div class="clock-time" id="simT">22<span class="blink-colon">:</span>00<span class="blink-colon">:</span>00</div>
+<div class="clock-period" id="clockPeriod"><span class="period-name">夜间巡检</span> 高危时段</div>
+</div>
+</div>
 <span>FPS <b id="fps">60</b></span>
 </div>
 </div>
@@ -573,7 +587,22 @@ function loop(ts) {
 
 // ============ UI更新 ============
 function updateUI() {
-    document.getElementById('simT').textContent=p2(clockH)+':'+p2(clockM)+':'+p2(Math.floor(clockS));
+    // 更新仿真时钟
+    var h=p2(clockH), m=p2(clockM), s=p2(Math.floor(clockS));
+    document.getElementById('simT').innerHTML=h+'<span class="blink-colon">:</span>'+m+'<span class="blink-colon">:</span>'+s;
+
+    // 更新时段图标和文字
+    var icon='🌙', period='夜间巡检', sub='高危时段';
+    if(clockH>=5&&clockH<7){icon='🌅';period='清晨';sub='天色渐亮';}
+    else if(clockH>=7&&clockH<9){icon='☀️';period='早晨';sub='交班时段';}
+    else if(clockH>=9&&clockH<12){icon='☀️';period='上午';sub='日间巡查';}
+    else if(clockH>=12&&clockH<14){icon='🌤️';period='中午';sub='午间休息';}
+    else if(clockH>=14&&clockH<17){icon='☀️';period='下午';sub='日间巡查';}
+    else if(clockH>=17&&clockH<19){icon='🌇';period='傍晚';sub='交接时段';}
+    else if(clockH>=19&&clockH<22){icon='🌆';period='夜间';sub='就寝准备';}
+    else{icon='🌙';period='夜间巡检';sub='高危时段';}
+    document.getElementById('clockIcon').textContent=icon;
+    document.getElementById('clockPeriod').innerHTML='<span class="period-name">'+period+'</span> '+sub;
     if(robot.curRoom>0) document.getElementById('rsP').textContent=robot.curRoom+'号 检查中';
     else if(robot.isNav) document.getElementById('rsP').textContent='→ '+robot.targetRoom+'号 快速前往';
     else document.getElementById('rsP').textContent='巡航 → '+robot.targetRoom+'号';
